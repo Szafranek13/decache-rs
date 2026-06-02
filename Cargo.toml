@@ -1,0 +1,14 @@
+[package]
+name = "decache-linux"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+walkdir = "2"
+dirs = "6.0.0"
+rusqlite = { version = "0.39", features = ["bundled"] }
+infer = "0.19.0"
+#image operations and hashing
+ffmpeg-sidecar = "2.5.1"
+img_hash = "3.2"
+image = { version = "0.23.14", features = ["png"] }

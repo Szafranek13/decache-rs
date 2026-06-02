@@ -1,0 +1,107 @@
+//No AI was used to write this program, I have alergy to ai slop.
+//Also, i learned rust like 1 year ago, so this probably can be optimised
+//
+//28.05.2026 Added parsing data/video_data.txt into struct
+//29.05.2026 Added parsing data/watch_page_data.txt, data/asset_data.txt, data/history_data.txt
+//   into vectors
+//
+
+use std::fs::read_to_string;
+
+//Struct for parsing video_data.txt
+//"Roblox+Video+101|-8128339497863628282,39c9cb3870db6751|0000000000000000|00:03:52.43|00:03:52.63"
+//VIDEO TITLE|GOOGLE_VIDEO_ID,GOOGLE_VIDEO_CONTENT_ID|HASH|DUR_MIN|DUR_MAX
+#[derive(Debug)]
+struct VideoData {
+    //SOME REGEX ATTEMPT WAS FOR TITLE I SEE. WHY CAN'T THE BATCH JUST SCRIPT SPLIT EVERY WORD???
+    title: String,
+    ids: Vec<String>,
+    hash: String,
+    duration_min: String,
+    duration_max: String
+}
+
+#[derive(Debug)]
+struct DataSet {
+    video_data: Vec<VideoData>,
+    watch_page_data: Vec<String>,
+    asset_data: Vec<String>,
+    history_data: Vec<String>
+}
+
+fn read_lines(filename: &str) -> Vec<String> {
+    read_to_string(filename)
+        .expect("Error reading {filename}")  // panic when no data_video file!!!
+        .lines()
+        .map(String::from)
+        .collect()
+}
+
+fn load_dataset() -> DataSet {
+
+    //Loading dataset
+    
+    //read lines of video_data.txt
+    let video_data = read_lines("./data/video_data.txt");
+    
+    let mut video_data_hashmap_vec: Vec<VideoData> = Vec::new();
+
+    //process each line of the file
+    for entry in video_data {
+        //remove quotes from the line
+        let entry_sanitised = &entry.strip_prefix('"')
+                                .and_then(|entry| entry.strip_suffix('"'))
+                                .unwrap_or(&entry);
+        let entry_vec: Vec<&str> = entry_sanitised.split("|").collect(); //split the line into vector by "|"
+        if entry_vec.len() != 5 {
+            panic!("Some entry has less than 5 elements!"); // panic when not enough data!!!
+        };
+
+    //create hashmap from vector
+        let entry_hashmap = VideoData {
+            title: entry_vec[0].to_string(),
+            ids: entry_vec[1]
+                .split(",") //split ids by ","
+                .map(|p| p.to_string())
+                .collect(),
+            hash: entry_vec[2].to_string(),
+            duration_min: entry_vec[3].to_string(),
+            duration_max: entry_vec[4].to_string(),
+        };
+
+        video_data_hashmap_vec.push(entry_hashmap);
+    };
+    println!("Loaded {} entries from data/video_data.txt", video_data_hashmap_vec.len());
+    
+    let watch_page_data = read_lines("./data/watch_page_data.txt");
+    println!("Loaded {} entries from data/watch_page_data.txt", watch_page_data.len());
+    
+    let asset_data = read_lines("./data/asset_data.txt");
+    println!("Loaded {} entries from data/asset_data.txt", asset_data.len());
+
+    let history_data = read_lines("./data/history_data.txt");
+    //Nevermind, I refuse to turn it into mutable just to remove the junk
+    //that was left in the beggining of the dataset.
+    //Not my fault, not my problem, just make dataset without this crap i don't care...
+    //let history_data_junk = vec![
+    //"Visited On        :",
+    //"First Visit Date  :",
+    //"Last Visit Date   :",
+    //"Visit Time        :"
+    //];
+    //history_data.retain(|x| !history_data_junk.contains(&x.as_str()));
+    println!("Loaded {} entries from data/history_data.txt", history_data.len());
+    
+    DataSet {
+    video_data: video_data_hashmap_vec,
+    watch_page_data: watch_page_data,
+    asset_data: asset_data,
+    history_data: history_data
+    }
+}
+
+fn main() {
+    let dataset = load_dataset();
+    println!("{:#?}", dataset.video_data)
+    //TO DO: SCANNING AND THE REST
+}
