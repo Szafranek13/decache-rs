@@ -26,10 +26,12 @@ mod phash_ai_slop;
 
 use dirs::home_dir;
 use ffmpeg_sidecar::command::FfmpegCommand;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, ErrorCode};
+use rusqlite::ErrorCode::DatabaseBusy;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use std::error::Error;
 use std::{env, fs};
 use ini::Ini;
 
@@ -239,11 +241,23 @@ fn browser_history_scan(browser_name: &str, search_vector: Vec<String>) {
 				// "chrome" => "SELECT ??? FROM ??? WHERE ??? LIKE ?1",
 				_ => panic!("Browser not covered: {}", browser_name)
 			};
-	
-			let mut stmt = conn
-				.prepare(query)
-				.expect("Failed to prepare query");
-        
+			
+			let mut stmt = match conn.prepare(query) {
+				Ok(response) => response,
+				Err(error) => {
+					if let rusqlite::Error::SqliteFailure(err, _) = error {
+						match err.code {
+							rusqlite::ErrorCode::DatabaseBusy => {
+								panic!("The browser history database is locked, perhaps the browser is still running? Close it first.");
+							}
+							_ => panic!("Failed to prepare query due to an error: {:#?}", error),
+						}
+					} else {
+						panic!("Failed to prepare query due to an error: {:#?}", error);
+					}
+				}
+			};
+			
 			for search in &search_vector {
 				//build search querry
 				let pattern = format!("%{}%", search);
