@@ -26,12 +26,10 @@ mod phash_ai_slop;
 
 use dirs::home_dir;
 use ffmpeg_sidecar::command::FfmpegCommand;
-use rusqlite::{params, Connection, ErrorCode};
-use rusqlite::ErrorCode::DatabaseBusy;
+use rusqlite::{params, Connection};
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
-use std::error::Error;
 use std::{env, fs};
 use ini::Ini;
 
@@ -65,6 +63,14 @@ static LIBREWOLF_CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         .join("librewolf")
 });
 
+
+struct DataSet {
+    video_data: Vec<VideoData>,
+    watch_page_data: Vec<String>,
+    asset_data: Vec<String>,
+    history_data: Vec<String>,
+}
+
 //Struct for parsing video_data.txt
 //"Roblox+Video+101|-8128339497863628282,39c9cb3870db6751|0000000000000000|00:03:52.43|00:03:52.63"
 //VIDEO TITLE|GOOGLE_VIDEO_ID,GOOGLE_VIDEO_CONTENT_ID|HASH|DUR_MIN|DUR_MAX
@@ -75,13 +81,6 @@ struct VideoData {
     hash: Vec<u64>,
     duration_min: String,
     duration_max: String,
-}
-
-struct DataSet {
-    video_data: Vec<VideoData>,
-    watch_page_data: Vec<String>,
-    asset_data: Vec<String>,
-    history_data: Vec<String>,
 }
 
 fn read_lines(path: impl AsRef<Path>) -> Vec<String> {
@@ -165,7 +164,7 @@ fn load_dataset() -> DataSet {
     }
 }
 
-fn get_browser_history_profile_root(browser_name: &str) -> Option<PathBuf> {
+fn get_browser_config_profile_root(browser_name: &str) -> Option<PathBuf> {
 	match browser_name {
 		"firefox" => Some(home_dir().expect("Cannot read $HOME").join(".mozilla/firefox")),
 		"librewolf" => Some(home_dir().expect("Cannot read $HOME").join(".config/librewolf/librewolf")),
@@ -180,8 +179,8 @@ fn get_profile_list(browser_name: &str) -> Vec<String> {
 		//"chrome" => "SHIT",
 		_ => panic!("Browser not covered")
 	};
-	let browser_history_profile_root = get_browser_history_profile_root(&browser_name);
-	let profile_list_file_path = browser_history_profile_root
+	let browser_config_profile_root = get_browser_config_profile_root(&browser_name);
+	let profile_list_file_path = browser_config_profile_root
 		.expect("WOOF")
 		.join(profile_list_file);
 	
@@ -214,21 +213,20 @@ fn get_profile_history(browser_name: &str) -> &str {
 fn browser_history_scan(browser_name: &str, search_vector: Vec<String>) {
     println!("Scanning browser history...");
     
-    let browser_history_profile_root = get_browser_history_profile_root(&browser_name)
+    let browser_config_profile_root = get_browser_config_profile_root(&browser_name)
 										.expect("FRICK");
 	let profile_history = get_profile_history(&browser_name);
     
     //get history file of a profile
-    let profile_list_vector = get_profile_list("librewolf");
-	println!("{:#?}", profile_list_vector);
+    let profile_list_vector = get_profile_list(&browser_name);
     
     for folder in profile_list_vector {
 		let folder = PathBuf::from(folder);
 		//firefox and its forks uses places.sqlite, chrome uses History which is (sqlite3)
-		let history_file = browser_history_profile_root
+		let history_file = browser_config_profile_root
 			.join(folder.as_path()).join(get_profile_history(&browser_name));
 		if history_file.is_file() {
-			println!("{:#?}", history_file.display());
+			println!("Scanning {}...", history_file.display());
 			let conn = match browser_name {
 				"firefox" | "librewolf" =>
 					Connection::open(history_file).expect("Cannot open places.sqlite"),
@@ -270,14 +268,14 @@ fn browser_history_scan(browser_name: &str, search_vector: Vec<String>) {
 					let url: Option<String> = row.get(0).unwrap_or_default();
 					let title: Option<String> = row.get(1).unwrap_or_default();
 					println!(
-						"url: {}, title: {}",
+						"Found: url: {}, title: {}",
 						url.unwrap_or_default(),
 						title.unwrap_or_default()
 					);
 				}
 			}
 		} else {
-			println!("{} does not exists", history_file.display())
+			println!("{} does not exists. No attempt to scan", history_file.display())
 		}
 	}
 }
@@ -311,13 +309,14 @@ fn get_profile_cache(browser: &str) -> Option<&str> {
 fn browser_cache_scan(browser_name: &str, video_data: &Vec<VideoData>) {
     println!("Scanning {}'s cache...", browser_name);
 	
+	let profile_list_vector = get_profile_list(&browser_name);
+	
 	let browser_cache_profile_root = get_browser_cache_profile_root(browser_name).expect("DAMN");
     let profile_cache = get_profile_cache(browser_name).expect("CRAP");
     
-    println!("Browser profile root is {}", browser_cache_profile_root.display());
-   
-    for folder in fs::read_dir(&browser_cache_profile_root).expect("No profiles?") {
-        let folder_cache_path = &browser_cache_profile_root.join(folder.expect("POOP").path())
+    for folder in profile_list_vector {
+        let folder_cache_path = &browser_cache_profile_root
+								.join(PathBuf::from(folder))
 								.join(&profile_cache);
         
         if folder_cache_path.is_dir() {
@@ -430,9 +429,9 @@ fn main() {
     browser_history_scan("librewolf", dataset.history_data); //<--DONE FOR LIBREWOLF/FIREFOX
     
     //scan browsers cache for cached files
-    //for browser in vec!["librewolf"] {
-	//	browser_cache_scan(browser, &dataset.video_data); //<--DONE FOR LIBREWOLF/FIREFOX
-	//};
+    for browser in vec!["librewolf"] {
+		browser_cache_scan(browser, &dataset.video_data); //<--DONE FOR LIBREWOLF/FIREFOX
+	};
     
     println!("Done!");
 }
