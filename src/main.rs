@@ -12,7 +12,7 @@
 //   pHash.cpp because they gave different results, improved frame extractor to use image2 instead of rawvideo,
 //   improved comparator of hashes
 //01.06.2026 Made "hash" of VideoData structure a vector.
-//   Hashing works well, and fast.
+//   Hashing works well, and fast
 
 // TODO Generation of hashes and comparation should be
 	// in separate functions NOT in browser_cache_scan...
@@ -31,9 +31,10 @@ use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::{env, fs};
+use ini::Ini;
 
 //Constants and statics, mainly paths. LazyLock is a saviour <3
-//NO MOVE THOSE TO THE MATCH FUNCTION IN THE BROWSER SCAN
+//MOVE ALL THOSE TO MATCH FUNCTIONS
 
 static BASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let path = PathBuf::from("./");
@@ -54,13 +55,6 @@ static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 //NO BROWSER PROFILES AS LAZYLOCK, I CHANGED MY MIND IT'S A MESS
-static FIREFOX_CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    home_dir()
-        .expect("Cannot read $HOME")
-        .join(".cache")
-        .join("mozilla")
-        .join("firefox")
-});
 
 static LIBREWOLF_CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     home_dir()
@@ -169,38 +163,109 @@ fn load_dataset() -> DataSet {
     }
 }
 
-fn parse_sqlite(search_vector: Vec<String>) {
+fn get_browser_history_profile_root(browser_name: &str) -> Option<PathBuf> {
+	match browser_name {
+		"firefox" => Some(home_dir().expect("Cannot read $HOME").join(".mozilla/firefox")),
+		"librewolf" => Some(home_dir().expect("Cannot read $HOME").join(".config/librewolf/librewolf")),
+		"chrome" => Some(home_dir().expect("Cannot read $HOME").join(".config/google-chrome")),
+		_ => panic!("Browser not covered")
+	}
+}
+
+fn get_profile_list(browser_name: &str) -> Vec<String> {
+	let profile_list_file = match browser_name {
+		"firefox" | "librewolf" => "profiles.ini",
+		//"chrome" => "SHIT",
+		_ => panic!("Browser not covered")
+	};
+	let browser_history_profile_root = get_browser_history_profile_root(&browser_name);
+	let profile_list_file_path = browser_history_profile_root
+		.expect("WOOF")
+		.join(profile_list_file);
+	
+	let profiles_list_file_content = Ini::load_from_file(&profile_list_file_path).unwrap();
+	
+	let mut profile_list_vector: Vec<String> = Vec::new();
+	
+	for (section, props) in profiles_list_file_content.iter() {
+		if let Some(section_name) = section {
+			if section_name.starts_with("Profile") {
+				match props.get("Path") {
+					Some(path) => profile_list_vector.push(path.to_owned()),
+					None => panic!("Profile section is missing Path value, skipping..."),
+				}
+			}
+		}
+	}
+	
+	profile_list_vector
+}
+
+fn get_profile_history(browser_name: &str) -> &str {
+	match browser_name {
+		"firefox" | "librewolf" => "places.sqlite",
+		"chrome" => "History",
+		_ => panic!("Browser not covered")
+	}
+}
+
+fn browser_history_scan(browser_name: &str, search_vector: Vec<String>) {
     println!("Scanning browser history...");
-    //firefox and its forks uses places.sqlite, chrome uses History.sqlite?
-
-    //Firefox
-    //" ~/.config/librewolf/librewolf/bgvrjjel.default-default/places.sqlite"
-    let conn = Connection::open("places.sqlite").expect("Cannot open places.sqlite");
-
-    //Chrome
-    // ?~/.config/google-chrome/Default/History.sqlite?
-    //let conn = Connection::open("places.sqlite").expect("Cannot open History.sqlite");
-    let mut stmt = conn
-        .prepare("SELECT url, title FROM moz_places WHERE url LIKE ?1")
-        .expect("Failed to prepare query");
-    for search in &search_vector {
-        //build search querry
-        let pattern = format!("%{}%", search);
-
-        //prepare query that will search for stuff and execute it
-        let mut rows = stmt.query(params![pattern]).expect("Query failed");
-
-        // loop through rows
-        while let Some(row) = rows.next().expect("Failed to fetch row") {
-            let url: Option<String> = row.get(0).unwrap_or_default();
-            let title: Option<String> = row.get(1).unwrap_or_default();
-            println!(
-                "url: {}, title: {}",
-                url.unwrap_or_default(),
-                title.unwrap_or_default()
-            );
-        }
-    }
+    
+    let browser_history_profile_root = get_browser_history_profile_root(&browser_name)
+										.expect("FRICK");
+	let profile_history = get_profile_history(&browser_name);
+    
+    //get history file of a profile
+    let profile_list_vector = get_profile_list("librewolf");
+	println!("{:#?}", profile_list_vector);
+    
+    for folder in profile_list_vector {
+		let folder = PathBuf::from(folder);
+		//firefox and its forks uses places.sqlite, chrome uses History which is (sqlite3)
+		let history_file = browser_history_profile_root
+			.join(folder.as_path()).join(get_profile_history(&browser_name));
+		if history_file.is_file() {
+			println!("{:#?}", history_file.display());
+			let conn = match browser_name {
+				"firefox" | "librewolf" =>
+					Connection::open(history_file).expect("Cannot open places.sqlite"),
+				//"chrome" =>
+					//Connection::open("History").expect("Cannot open History"),
+				_ => panic!("Browser not covered: {}", browser_name)
+			};
+			let query = match browser_name {
+				"firefox" | "librewolf" => "SELECT url, title FROM moz_places WHERE url LIKE ?1",
+				// "chrome" => "SELECT ??? FROM ??? WHERE ??? LIKE ?1",
+				_ => panic!("Browser not covered: {}", browser_name)
+			};
+	
+			let mut stmt = conn
+				.prepare(query)
+				.expect("Failed to prepare query");
+        
+			for search in &search_vector {
+				//build search querry
+				let pattern = format!("%{}%", search);
+	
+				//prepare query that will search for stuff and execute it
+				let mut rows = stmt.query(params![pattern]).expect("Query failed");
+	
+				// loop through rows
+				while let Some(row) = rows.next().expect("Failed to fetch row") {
+					let url: Option<String> = row.get(0).unwrap_or_default();
+					let title: Option<String> = row.get(1).unwrap_or_default();
+					println!(
+						"url: {}, title: {}",
+						url.unwrap_or_default(),
+						title.unwrap_or_default()
+					);
+				}
+			}
+		} else {
+			println!("{} does not exists", history_file.display())
+		}
+	}
 }
 
 // check file mime type
@@ -209,14 +274,14 @@ fn check_filetype(path: impl AsRef<Path>) -> Option<String> {
     Some(kind.mime_type().to_string())
 }
 
-fn get_browser_cache_profile_root(browser: &str) -> Option<PathBuf> {
+fn get_browser_cache_profile_root(browser_name: &str) -> Option<PathBuf> {
     let home = dirs::home_dir()?;
 
-    match browser {
+    match browser_name {
         "firefox" => Some(home.join(".cache/firefox")),
         "librewolf" => Some(home.join(".cache/librewolf")),
         "chrome" => Some(home.join(".config/google-chrome")),
-        _ => None,
+		_ => panic!("No such browser")
     }
 }
 
@@ -233,16 +298,13 @@ fn browser_cache_scan(browser_name: &str, video_data: &Vec<VideoData>) {
     println!("Scanning {}'s cache...", browser_name);
 	
 	let browser_cache_profile_root = get_browser_cache_profile_root(browser_name).expect("DAMN");
+    let profile_cache = get_profile_cache(browser_name).expect("CRAP");
     
     println!("Browser profile root is {}", browser_cache_profile_root.display());
-    
+   
     for folder in fs::read_dir(&browser_cache_profile_root).expect("No profiles?") {
-        //Check what browser are we skanning
-        //let folder_name = &folder.unwrap().file_name().to_string_lossy();
-        
-        //FOLDER CACHE PATH = browser_profile_root + cache2 /
-        let profile_cache = get_profile_cache(browser_name).expect("CRAP");
-        let folder_cache_path = &browser_cache_profile_root.join(folder.expect("POOP").path()).join(profile_cache);
+        let folder_cache_path = &browser_cache_profile_root.join(folder.expect("POOP").path())
+								.join(&profile_cache);
         
         if folder_cache_path.is_dir() {
             println!("Scanning {:?}", folder_cache_path);
@@ -351,11 +413,12 @@ fn main() {
     
     //search video ids in browser
     
-    //parse_sqlite(dataset.history_data); //<--DONE FOR LIBREWOLF/FIREFOX
+    browser_history_scan("librewolf", dataset.history_data); //<--DONE FOR LIBREWOLF/FIREFOX
     
     //scan browsers cache for cached files
-    for browser in vec!["librewolf"] {
-		browser_cache_scan(browser, &dataset.video_data); //<--DONE FOR LIBREWOLF/FIREFOX
-	};
+    //for browser in vec!["librewolf"] {
+	//	browser_cache_scan(browser, &dataset.video_data); //<--DONE FOR LIBREWOLF/FIREFOX
+	//};
+    
     println!("Done!");
 }
