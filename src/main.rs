@@ -19,6 +19,8 @@
 // TODO Make "0000000000000000" hash be a None.
 // TODO Do something about the ffmpeg bottlneck maybe...
 // TODO The most important functions (scanning) should return Result propperly instead of panicing
+// TODO Chrome/Chromium stores cache in a weird format, process it
+
 mod browser_paths;
 mod dataset;
 mod phash_ai_slop;
@@ -28,7 +30,6 @@ use ffmpeg_sidecar::command::FfmpegCommand;
 use ini::Ini;
 use rusqlite::{params, Connection};
 use serde_json::Value;
-use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::{env, fs};
