@@ -21,6 +21,12 @@
 // TODO The most important functions (scanning) should return Result propperly instead of panicing
 // TODO Chrome/Chromium stores cache in a weird format, process it
 
+//The original script seems to copy only MP4 FLV and WEBM video files to Unveryfied
+//It also checks if a video file it found is complete by checking if it has ftyp at the beggining of file
+//if it doesnt then it's not a first piece of a video, but the middle or the final, and then it 
+//concentate them
+//
+
 mod browser_paths;
 mod dataset;
 mod phash_ai_slop;
@@ -168,11 +174,20 @@ fn browser_history_scan(browser: &browser_paths::Browser, search_vector: &Vec<St
 }
 
 // check file mime type
-fn check_filetype(path: impl AsRef<Path>) -> Option<String> {
-    let kind = infer::get_from_path(path).ok()??;
-    Some(kind.mime_type().to_string())
+fn check_filetype(path: impl AsRef<Path>) -> String {//Option<String> {
+	match infer::get_from_path(path).expect("Fuk") {
+		Some(kind) => kind.extension().to_string(),
+		None => "Unknown".to_string(),
+	}
 }
 
+
+//Check if mp4 file is a complete file or just a part of a longer video
+fn check_if_video_stream_is_complete() {
+	todo!();
+}
+
+/// Scans browser's cache for video files
 fn browser_cache_scan(browser: &browser_paths::Browser, video_data: &Vec<dataset::VideoData>) {
     println!("Scanning {}'s cache...", browser.name);
 
@@ -197,8 +212,9 @@ fn browser_cache_scan(browser: &browser_paths::Browser, video_data: &Vec<dataset
                         let mut similarity = Vec::new();
                         let mut similarity_pack = Vec::new();
 
-                        let buf = fs::read(&cache_entry_path).unwrap();
-                        if infer::is_video(&buf) {
+                        let filetype = check_filetype(&cache_entry_path);
+						
+						if ["mp4", "webm", "flv"].contains(&filetype.as_str()) {
                             //|| infer::is_image(&buf){
                             //println!("{:?}", cache_entry_path);
                             //extract frame and gen hash
@@ -207,6 +223,7 @@ fn browser_cache_scan(browser: &browser_paths::Browser, video_data: &Vec<dataset
                                 .unwrap()
                                 .to_string_lossy()
                                 .into_owned();
+
                             println!("Checking {}", cache_entry_file_name);
 
                             //if the temporary dir is there remove it
@@ -225,8 +242,7 @@ fn browser_cache_scan(browser: &browser_paths::Browser, video_data: &Vec<dataset
                                 PathBuf::from(&tmp_file),
                             );
 
-                            for video_data_entry in video_data {
-                                println!("{:?}", video_data_entry.title);
+                            for (i, video_data_entry) in video_data.into_iter().enumerate() {
                                 for file in fs::read_dir(&potential_file_path).unwrap() {
                                     let path = file.unwrap().path();
                                     let filepath = path.to_str().unwrap();
@@ -245,7 +261,15 @@ fn browser_cache_scan(browser: &browser_paths::Browser, video_data: &Vec<dataset
                                         None => println!("No hashes in vector!"),
                                     }
                                 }
-                                println!("Similarity: {:?}", similarity_pack.iter().min().unwrap());
+                                use std::io::{self, Write};
+                                print!("{i} /600\r");
+                                io::stdout().flush().unwrap();
+                                let similarity_final = similarity_pack.iter().min().unwrap();
+                                //only if similarity difference is less than 5
+                                if *similarity_final < 5 as u32 {
+									println!();
+									println!("Closest similarity of {:?} is {:?}", video_data_entry.title, similarity_final);
+								}
                             }
 
                             //remove temp directories with raw files afterwards
@@ -310,6 +334,5 @@ fn main() {
     for browser in &detected_browsers {
         browser_cache_scan(&browser, &dataset.video_data); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM
     }
-
     println!("Done!");
 }
