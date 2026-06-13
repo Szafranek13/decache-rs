@@ -16,7 +16,6 @@
 
 // TODO Generation of hashes and comparation should be
 // in separate functions NOT in browser_cache_scan...
-// TODO Make "0000000000000000" hash be a None.
 // TODO Do something about the ffmpeg bottlneck maybe...
 // TODO The most important functions (or all of them) should return Result propperly instead of panicing
 // TODO Chrome/Chromium stores cache in a weird format, process it
@@ -30,7 +29,7 @@
 
 
 mod browsette;
-use crate::browsette::{BrowserName, BrowserFamily};
+use crate::browsette::{Browser, BrowserName, BrowserFamily};
 
 mod cache2_metadata;
 mod cache2_entry_metadata;
@@ -58,7 +57,7 @@ static BASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     path
 });
 
-fn detect_browsers(browser_paths: &[browsette::Browser]) -> Vec<&browsette::Browser> {
+fn detect_browsers(browser_paths: &[Browser]) -> Vec<&Browser> {
     let mut detected_browser_paths = Vec::new();
     let home_dir = home_dir().expect("Cannot read $HOME");
     for browser in browser_paths {
@@ -69,7 +68,7 @@ fn detect_browsers(browser_paths: &[browsette::Browser]) -> Vec<&browsette::Brow
     detected_browser_paths
 }
 
-fn get_profile_list(browser: &browsette::Browser) -> Vec<String> {
+fn get_profile_list(browser: &Browser) -> Vec<String> {
     let home_dir = home_dir().expect("Cannot read $HOME");
 
     let browser_config_profile_root = home_dir.join(browser.config_path);
@@ -105,13 +104,12 @@ fn get_profile_list(browser: &browsette::Browser) -> Vec<String> {
                 panic!("No profiles found in Local State");
             }
         }
-        _ => panic!("DAMN"),
     }
 
     profile_list_vector
 }
 
-fn browser_history_scan(browser: &browsette::Browser, search_vector: &Vec<String>) {
+fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>) {
     println!("Scanning {}'s history...", &browser.name);
     let home_dir = home_dir().expect("No $HOME dir");
 
@@ -133,7 +131,6 @@ fn browser_history_scan(browser: &browsette::Browser, search_vector: &Vec<String
             let query = match browser.family {
                 BrowserFamily::Gecko => "SELECT url, title FROM moz_places WHERE url LIKE ?1",
                 BrowserFamily::Chromium => "SELECT url, title FROM urls WHERE url LIKE ?1",
-                _ => panic!("Browser not supported"),
             };
 
             match conn.prepare(query) {
@@ -206,7 +203,7 @@ fn check_if_video_stream_is_complete() {
     todo!();
 }
 
-fn browser_cache_asset_scan(browser: &browsette::Browser, asset_data: &[String]) {
+fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String]) {
     println!(
         "Scanning {}'s cache for asset_data.txt entries...",
         browser.name
@@ -292,7 +289,7 @@ fn browser_cache_asset_scan(browser: &browsette::Browser, asset_data: &[String])
 
 /// Scans browser's cache for video files
 fn browser_cache_video_scan(
-    browser: &browsette::Browser,
+    browser: &Browser,
     video_data: &[dataset::VideoData],
 ) {
     println!(
@@ -318,8 +315,6 @@ fn browser_cache_video_scan(
                     //is it a file and a video file
                     if cache_entry_path.is_file() {
                         //initialize vector of similarity values
-                        let mut similarity = Vec::new();
-                        let mut similarity_pack = Vec::new();
 
                         let filetype = check_filetype(&cache_entry_path);
 
@@ -352,6 +347,8 @@ fn browser_cache_video_scan(
                             );
 
                             for (i, video_data_entry) in video_data.into_iter().enumerate() {
+                                let mut similarity_pack = Vec::new();
+                                let mut similarity = Vec::new();
                                 for file in fs::read_dir(&potential_file_path).unwrap() {
                                     let path = file.unwrap().path();
                                     let filepath = path.to_str().unwrap();
@@ -423,7 +420,7 @@ fn extract_videoframes(input_file: PathBuf, output_file: PathBuf) {
             output,
         ])
         .spawn()
-        .expect("ffmpeg didn't even try :(")
+        .expect("You need ffmpeg installed for scanning cached videos!")
         .wait()
         .expect("ffmpeg gave up :(");
 }
@@ -442,14 +439,20 @@ fn main() {
 
     //load dataset
     let dataset = dataset::load_dataset(BASE_DIR.join("data")); //<-- DONE
-    /*
+
+    println!("video_data: {}, watch_page_data: {}, asset_data: {}, history_data: {}", dataset.video_data.len(),
+                                                                                        dataset.watch_page_data.len(),
+                                                                                        dataset.asset_data.len(),
+                                                                                        dataset.history_data.len());
+    
+    
     for browser in &detected_browsers {
         //search video ids in browser history
         browser_history_scan(&browser, &dataset.history_data); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM
     }
     for browser in &detected_browsers {
         browser_cache_video_scan(&browser, &dataset.video_data); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM
-    }*/
+    }
     for browser in &detected_browsers {
         browser_cache_asset_scan(&browser, &dataset.asset_data); //TODO
     }
