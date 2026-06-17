@@ -8,6 +8,7 @@ pub struct Browser {
     pub profiles_file: &'static str,
     pub history_file: &'static str,
     pub cache_path: &'static str,
+    pub cache_index_file: &'static str,
     pub cache_entries_path: &'static str,
 }
 
@@ -22,10 +23,10 @@ pub enum BrowserName {
 impl fmt::Display for BrowserName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BrowserName::Firefox => write!(f, "Firefox"),
-            BrowserName::LibreWolf => write!(f, "Librewolf"),
-            BrowserName::Chrome => write!(f, "Chrome"),
-            BrowserName::Chromium => write!(f, "Chromium"),
+            Self::Firefox => write!(f, "Firefox"),
+            Self::LibreWolf => write!(f, "Librewolf"),
+            Self::Chrome => write!(f, "Chrome"),
+            Self::Chromium => write!(f, "Chromium"),
         }
     }
 }
@@ -36,7 +37,6 @@ pub enum BrowserFamily {
     Chromium,
 }
 
-#[allow(dead_code)]
 pub static SUPPORTED_BROWSERS: &[Browser] = &[
     Browser {
         name: BrowserName::Firefox,
@@ -45,6 +45,7 @@ pub static SUPPORTED_BROWSERS: &[Browser] = &[
         profiles_file: "profiles.ini",
         history_file: "places.sqlite",
         cache_path: ".cache/firefox",
+        cache_index_file: "cache2/index",
         cache_entries_path: "cache2/entries",
     },
     Browser {
@@ -54,6 +55,7 @@ pub static SUPPORTED_BROWSERS: &[Browser] = &[
         profiles_file: "profiles.ini",
         history_file: "places.sqlite",
         cache_path: ".cache/librewolf",
+        cache_index_file: "cache2/index",
         cache_entries_path: "cache2/entries",
     },
     Browser {
@@ -63,7 +65,8 @@ pub static SUPPORTED_BROWSERS: &[Browser] = &[
         profiles_file: "Local State",
         history_file: "History",
         cache_path: ".cache/google-chrome",
-        cache_entries_path: "cache2/entries", //in older ver Cache/
+        cache_index_file: "Cache/index-dir/the-real-index",
+        cache_entries_path: "Cache/Cache_Data", //apparently, the older one used different one?
     },
     Browser {
         name: BrowserName::Chromium,
@@ -72,6 +75,7 @@ pub static SUPPORTED_BROWSERS: &[Browser] = &[
         profiles_file: "Local State",
         history_file: "History",
         cache_path: ".cache/chromium",
-        cache_entries_path: "cache2/entries", //see chrome's one for info
+        cache_index_file: "Cache/index-dir/the-real-index",
+        cache_entries_path: "Cache/Cache_Data",
     },
 ];
