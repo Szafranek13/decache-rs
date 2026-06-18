@@ -1,9 +1,8 @@
-use std::fmt;
 use dirs::home_dir;
 use ini::Ini;
 use serde_json::Value;
+use std::fmt;
 use std::fs;
-
 
 #[derive(Debug)]
 pub struct Browser {
@@ -88,25 +87,23 @@ pub static SUPPORTED_BROWSERS: &[Browser] = &[
 ];
 
 #[cfg(target_os = "windows")]
-pub static SUPPORTED_BROWSERS: &[Browser] = &[
-    Browser {
-        name: BrowserName::Firefox,
-        family: BrowserFamily::Gecko,
-        config_path: "AppData\\Mozilla\\Firefox",
-        profiles_file: "profiles.ini",
-        history_file: "places.sqlite",
-        cache_path: "AppData\\Local\\Mozilla\\Firefox",
-        cache_index_file: "cache2\\index",
-        cache_entries_path: "cache2\\entries",
-    },
-];
+pub static SUPPORTED_BROWSERS: &[Browser] = &[Browser {
+    name: BrowserName::Firefox,
+    family: BrowserFamily::Gecko,
+    config_path: "AppData\\Mozilla\\Firefox",
+    profiles_file: "profiles.ini",
+    history_file: "places.sqlite",
+    cache_path: "AppData\\Local\\Mozilla\\Firefox",
+    cache_index_file: "cache2\\index",
+    cache_entries_path: "cache2\\entries",
+}];
 
 pub fn detect_browsers(browser_paths: &[Browser]) -> Vec<&Browser> {
     #[cfg(target_os = "linux")]
     let home_dir = home_dir().expect("Cannot read $HOME");
     #[cfg(target_os = "windows")]
     let home_dir = home_dir().expect("Cannot read %USERPROFILE%");
-    
+
     let mut detected_browser_paths = Vec::new();
     for browser in browser_paths {
         if home_dir.join(browser.config_path).is_dir() {
