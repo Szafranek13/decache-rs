@@ -336,9 +336,13 @@ fn browser_cache_video_scan(
                                         None => println!("No hashes in vector!"),
                                     }
                                 }
-                                use std::io::{self, Write};
-                                print!("{i} /{}\r", video_data.len());
-                                io::stdout().flush().unwrap();
+
+                                //                                use std::io::{self, Write};
+                                //                                print!("{i} /{}\r", video_data.len());
+                                //                                io::stdout().flush().unwrap();
+
+                                tx.send(format!("{}/{}\r", i, video_data.len())).ok();
+
                                 let difference_final = difference_pack.iter().min().unwrap();
                                 // only if difference is less than 5
                                 if *difference_final < 5 as u32 {
@@ -402,24 +406,28 @@ fn extract_videoframes(input_file: PathBuf, output_file: PathBuf) {
 
 // Do it all
 fn process(tx: Sender<String>) {
-    tx.send("Starting scan...".into()).ok();
+    tx.send("Starting...".into()).ok();
     //load browser paths
     let linux_browser_paths = browsette::SUPPORTED_BROWSERS;
 
     //detect browsers installed on the pc
     let detected_browsers = detect_browsers(linux_browser_paths);
 
-    println!("{:#?}", &detected_browsers);
+    tx.send("Detected browsers:".into()).ok();
+    for browser in &detected_browsers {
+        tx.send(format!("\t{} at {}", browser.name, browser.config_path))
+            .ok();
+    }
 
     //load dataset
     let dataset = dataset::load_dataset(BASE_DIR.join("data")); //<-- DONE
 
     tx.send(format!(
-        "video_data: {}, watch_page_data: {}, asset_data: {}, history_data: {}",
-        dataset.video_data.len(),
-        dataset.watch_page_data.len(),
-        dataset.asset_data.len(),
-        dataset.history_data.len()
+            "Loaded database:\n\tvideo_data: {},\n\twatch_page_data: {},\n\tasset_data: {},\n\thistory_data: {}",
+            dataset.video_data.len(),
+            dataset.watch_page_data.len(),
+            dataset.asset_data.len(),
+            dataset.history_data.len()
     ))
     .ok();
 
@@ -438,6 +446,18 @@ fn process(tx: Sender<String>) {
     tx.send("Done!".into()).ok();
 }
 
+struct LogMessage {
+    //TODO To be used
+    message: String,
+    level: LogLevel,
+}
+
+enum LogLevel {
+    Info,
+    Warning,
+    Error,
+}
+
 use eframe::egui;
 use egui::Ui;
 
@@ -445,6 +465,7 @@ use std::sync::mpsc::{self, Receiver, Sender};
 
 struct MyApp {
     log: String,
+    progress: f32,
     rx: Receiver<String>,
     tx: Sender<String>,
 }
@@ -454,7 +475,8 @@ impl Default for MyApp {
         let (tx, rx) = mpsc::channel();
 
         Self {
-            log: String::new(),
+            log: "Press Start to start!\n".to_string(),
+            progress: 0.0,
             rx,
             tx,
         }
@@ -464,7 +486,7 @@ impl Default for MyApp {
 fn main() -> eframe::Result {
     //    egui_logger::builder().init().unwrap();
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([720.0, 480.0]),
         ..Default::default()
     };
 
@@ -485,24 +507,32 @@ impl eframe::App for MyApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Decache-rs");
 
-            let mut log_text = String::from(
-                "This is a read-only log box\n\
-                 Line 2\n\
-                 Line 3",
-            );
+            egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                ui.set_height(ui.available_height() - 50.0); //VERY WRONG THING TO DO
+                ui.set_width(ui.available_width());
+                egui::ScrollArea::vertical()
+                    .stick_to_bottom(true)
+                    .show(ui, |ui| {
+                        ui.monospace(&self.log);
+                    });
+            });
 
-            egui::ScrollArea::vertical()
-                .stick_to_bottom(true)
-                .show(ui, |ui| {
-                    ui.monospace(&self.log);
-                });
+            ui.add(egui::ProgressBar::new(self.progress).show_percentage());
 
-            if ui.button("Start").clicked() {
-                let tx = self.tx.clone();
-                std::thread::spawn(move || {
-                    process(tx);
-                });
-            }
+            ui.horizontal(|ui| {
+                if ui.button("Quit").clicked() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+
+                ui.add_space(ui.available_width() - 30.0); //WHAT A NAUGHTY BOY
+
+                if ui.button("Start").clicked() {
+                    let tx = self.tx.clone();
+                    std::thread::spawn(move || {
+                        process(tx);
+                    });
+                }
+            });
         });
     }
 }

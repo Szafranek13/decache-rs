@@ -2,12 +2,15 @@
 
 ## THIS SOFTWARE IS NOT YET READY TO BE USED BEWARE
 
-A Rust rewrite of Decache by SindexMon https://github.com/SindexMon/decache/ aimed to have GUI and work on Windows, Linux and Mac.
+A Rust rewrite of Decache by SindexMon https://github.com/SindexMon/decache/ aimed to have GUI and work on Linux, Windows and Mac.
 It is aimed to be fully compatibile with assets of the original Decache.
+
+# ![](screenshot.png)
 
 ### What is done:
 1. Scanning for entries from `history_data.txt` in browser history of every profile of Firefox, Librewolf, Chrome and Chromium
 2. Scanning browser cache of Firefox and Librewolf and comparing hashes of found videos' frames with hashes of entries from `video_data.txt`
 
 Use `cargo build --release --target x86_64-unknown-linux-gnu` to build it for linux
+
 [![Developed by a human not by AI](https://notbyai.fyi/img/developed-by-human-not-by-ai-white.svg)](https://notbyai.fyi/)
