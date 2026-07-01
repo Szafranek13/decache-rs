@@ -35,20 +35,20 @@ pub struct VideoData {
     pub duration_max: String,
 }
 
-fn read_lines(path: impl AsRef<Path>) -> Vec<String> {
-    read_to_string(path.as_ref())
-        .expect("Error reading file")
+fn read_lines(path: impl AsRef<Path>) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let read_string = read_to_string(path.as_ref())?
         .lines()
         .map(String::from)
-        .collect()
+        .collect();
+    Ok(read_string)
 }
 
 ///Loads all files from "data" directory into fields of DataSet.
-pub fn load_dataset(data_dir: PathBuf) -> DataSet {
+pub fn load_dataset(data_dir: PathBuf) -> Result<DataSet, Box<dyn std::error::Error>> {
     //Loading dataset
     //Read lines of video_data.txt
     let video_data_path = data_dir.join("video_data.txt");
-    let video_data = read_lines(&video_data_path);
+    let video_data = read_lines(&video_data_path)?;
 
     let mut video_data_struct_vec: Vec<VideoData> = Vec::new();
 
@@ -65,11 +65,12 @@ pub fn load_dataset(data_dir: PathBuf) -> DataSet {
         if entry_vec.len() != 5 {
             // panic when not enough data!!!
 
-            panic!(
+            return Err(format!(
                 "Expected 5 fields, got {} in line: {}",
                 entry_vec.len(),
                 entry_sanitised
-            );
+            )
+            .into());
         }
         //create VideoData structure from vector
         let entry_struct = VideoData {
@@ -94,31 +95,31 @@ pub fn load_dataset(data_dir: PathBuf) -> DataSet {
         video_data_path.display()
     );*/
     let watch_page_data_path = data_dir.join("watch_page_data.txt");
-    let watch_page_data = read_lines(&watch_page_data_path);
+    let watch_page_data = read_lines(&watch_page_data_path)?;
     /*println!(
         "Loaded {} entries from {}",
         watch_page_data.len(),
         watch_page_data_path.display()
     );*/
     let asset_data_path = data_dir.join("asset_data.txt");
-    let asset_data = read_lines(&asset_data_path);
+    let asset_data = read_lines(&asset_data_path)?;
     /*println!(
         "Loaded {} entries from {}",
         asset_data.len(),
         asset_data_path.display()
     );*/
     let history_data_path = data_dir.join("history_data.txt");
-    let history_data = read_lines(&history_data_path);
+    let history_data = read_lines(&history_data_path)?;
     /*println!(
         "Loaded {} entries from {}",
         history_data.len(),
         history_data_path.display()
     );*/
 
-    DataSet {
+    Ok(DataSet {
         video_data: video_data_struct_vec,
         watch_page_data,
         asset_data,
         history_data,
-    }
+    })
 }

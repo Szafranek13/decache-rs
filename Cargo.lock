@@ -885,6 +885,7 @@ version = "0.0.1"
 dependencies = [
  "byteorder",
  "chrome-cache-parser",
+ "chrono",
  "dirs",
  "eframe",
  "ffmpeg-sidecar",

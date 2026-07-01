@@ -1,5 +1,12 @@
-//Last 4 bytes of the every firefox's cache file is the byte number where the metadata starts.
-//I am so smart that it took me 4 days to realise that...
+/*
+ * Last 4 bytes of the every firefox's cache file is the byte number where the metadata starts.
+ * There is NO DOCUMENTATION about this in firefox source, wow, thanks mozzila
+ * IT HAS BEEN OVER 2 WEEKS, IT IS ALMOST AN ALPHA RELEASE
+ * AND THE WHOLE PARSER STILL HASN'T BEEN FIXED TO NOT OUTPUT THE GARBAGE AT THE START!!!!!!!
+ * I COMMAND YOU TO FIND A WAY TO CLEAN IT!!
+ *
+ * Nah, i think i will release Alpha without fixing this :) it's not like it's dangerous or anything anyway
+ */
 
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};

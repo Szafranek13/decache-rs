@@ -1,6 +1,7 @@
 pub enum GuiMessage {
     Log(LogMessage),
     Progress(ProgressMessage),
+    Finished,
 }
 
 pub struct LogMessage {
@@ -12,6 +13,7 @@ pub enum LogLevel {
     Info,
     Warning,
     Error,
+    Good,
 }
 
 pub struct ProgressMessage {
