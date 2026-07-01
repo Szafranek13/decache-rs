@@ -402,8 +402,8 @@ fn browser_cache_video_scan(
                                 .ok();
 
                                 let difference_final = difference_pack.iter().min().unwrap();
-                                // only if difference is less than or equal to 5
-                                if *difference_final <= 5 as u32 {
+                                // only if difference is less than or equal to 3
+                                if *difference_final <= 3 as u32 {
                                     tx.send(GuiMessage::Log(LogMessage {
                                         message: format!(
                                             "Found a match! Closest difference of {:?} is {:?}!",

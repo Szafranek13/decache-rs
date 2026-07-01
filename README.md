@@ -3,10 +3,10 @@
 A complete Rust rewrite of Decache by SindexMon https://github.com/SindexMon/decache/ (and all it's components) aimed to have GUI and work on Linux, Windows and Mac.
 It is aimed to be fully compatibile with assets of the original Decache.
 
-## pre-Alpha version (0.1.1) for Linux has been released!
+## pre-Alpha version (0.1.2) for Linux has been released!
 
 > [!CAUTION]
-> This is a pre-Alpha release, expect lots of bugs and not working stuff.
+> This is a pre-Alpha release, expect lots of bugs, not working stuff and false positives.
 
 > [!NOTE]
 > You need ffmpeg installed on your system for video_data entries to be scanned! For now the software will crash without it.
