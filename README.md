@@ -5,7 +5,7 @@ It is aimed to be fully compatibile with assets of the original Decache.
 
 ## pre-Alpha version (0.1.2) for Linux has been released!
 
-> [!CAUTION]
+> [!WARNING]
 > This is a pre-Alpha release, expect lots of bugs, not working stuff and false positives.
 
 > [!NOTE]
