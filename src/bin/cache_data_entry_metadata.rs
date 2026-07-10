@@ -10,7 +10,7 @@ use std::{
 const CHROMIUM_CACHE_ENTRY_MAGICK: u32 = u32::from_le_bytes([0x30, 0x5C, 0x72, 0xA7]);
 
 #[derive(Debug)]
-struct EntryHeader {f
+struct EntryHeader {
     magick: u32,
     version: u32,
     key_len: u32,

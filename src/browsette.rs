@@ -1,10 +1,16 @@
-// The name of this crate made by me is a reference to Bowser turning into a woman meme :D
+//! Contains all need data of different browsers
+//! and everything needed for finding them
+//!
+//! The name of this module is the reference to Bowser turning into a woman meme :D
+
 use dirs::home_dir;
 use ini::Ini;
 use serde_json::Value;
 use std::fmt;
 use std::fs;
 
+
+/// Struct for browser data
 #[derive(Debug)]
 pub struct Browser {
     pub name: BrowserName,
@@ -38,19 +44,20 @@ impl fmt::Display for BrowserName {
 
 #[derive(Debug, Clone)]
 pub enum BrowserFamily {
+    /// Firefox-based
     Gecko,
+    /// Chromium-based
     Chromium,
 }
 
-// CHANGE THIS CODE BELLOW. For example a linux user might want to scan their Window's' drive
+// CHANGE THIS CODE BELLOW. For example a linux user might want to scan their Window's drive
+/// For now it equeals <OS_NAME>_SUPPORTED_BROWSERS
 #[cfg(target_os = "linux")]
 pub static SUPPORTED_BROWSERS: &[Browser] = LINUX_SUPPORTED_BROWSERS;
 #[cfg(target_os = "windows")]
 pub static SUPPORTED_BROWSERS: &[Browser] = WINDOWS_SUPPORTED_BROWSERS;
 
-/// Slice of structs with common data of said browsers
-
-/// Slice of structs with data about all covered browsers
+/// Slice of structs with data about all covered browsers for Linux
 pub static LINUX_SUPPORTED_BROWSERS: &[Browser] = &[
     Browser {
         name: BrowserName::Firefox,
@@ -94,6 +101,7 @@ pub static LINUX_SUPPORTED_BROWSERS: &[Browser] = &[
     },
 ];
 
+/// Slice of structs with data about all covered browsers for Windows
 pub static WINDOWS_SUPPORTED_BROWSERS: &[Browser] = &[
     Browser {
         name: BrowserName::Firefox,

@@ -26,9 +26,9 @@ static BASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     path
 });
 
-fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, tx: &Sender<GuiMessage>) {
+fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_filename: &str, tx: &Sender<GuiMessage>) {
     tx.send(GuiMessage::Log(LogMessage {
-        message: format!("Scanning {}'s browser history...", &browser.name),
+        message: format!("Scanning {}'s browser history for {}'s entries...", &browser.name, dataset_filename),
         level: LogLevel::Info,
     }))
     .ok();
@@ -169,11 +169,12 @@ fn check_if_video_stream_is_complete() {
     todo!();
 }
 
-fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], tx: &Sender<GuiMessage>) {
+fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_filename: &str, tx : &Sender<GuiMessage>) {
     tx.send(GuiMessage::Log(LogMessage {
         message: format!(
-            "Scanning {}'s cache for asset_data.txt entries...",
-            browser.name
+            "Scanning {}'s cache for {}'s entries...",
+            browser.name,
+            dataset_filename
         ),
         level: LogLevel::Info,
     }))
@@ -297,12 +298,14 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], tx: &Sende
 fn browser_cache_video_scan(
     browser: &Browser,
     video_data: &[dataset::VideoData],
+    dataset_filename: &str,
     tx: &Sender<GuiMessage>,
 ) {
     tx.send(GuiMessage::Log(LogMessage {
         message: format!(
-            "Scanning {}'s cache for video_data.txt entries...",
-            browser.name
+            "Scanning {}'s cache for {} entries...",
+            browser.name,
+            dataset_filename
         ),
         level: LogLevel::Info,
     }))
@@ -514,14 +517,14 @@ pub fn process(tx: Sender<GuiMessage>) {
     };
     for browser in &detected_browsers {
         //search video ids in browser history
-        browser_history_scan(browser, &dataset.history_data, &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+        browser_history_scan(browser, &dataset.history_data, "history_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
     }
     for browser in &detected_browsers {
-        browser_cache_video_scan(browser, &dataset.video_data, &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+        browser_cache_video_scan(browser, &dataset.video_data, "video_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
     }
     for browser in &detected_browsers {
         //search assets in browser cache
-        browser_cache_asset_scan(browser, &dataset.asset_data, &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM
+        browser_cache_asset_scan(browser, &dataset.asset_data, "asset_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/
     }
     tx.send(GuiMessage::Log(LogMessage {
         message: "Done!".into(),
