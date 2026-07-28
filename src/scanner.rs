@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::{env, fs};
 
-use crate::gui_communication::*;
+use crate::gui_communication::{GuiMessage, LogMessage, LogLevel, ProgressMessage};
 
 //Constants and statics, mainly paths. LazyLock is a saviour <3
 //MOVE ALL THOSE TO MATCH FUNCTIONS
@@ -20,13 +20,13 @@ use crate::gui_communication::*;
 static BASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let path = PathBuf::from("./");
     if !path.is_dir() {
-        panic!("Cannot read base dir!: {}", path.display());
+        panic!("Cannot read base dir!: {}", path.display()); // TODO: Remove panic and add tx.send gui message error
     }
 
     path
 });
 
-fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_filename: &str, tx: &Sender<GuiMessage>) {
+fn browser_history_scan(browser: &Browser, search_vector: &[String], dataset_filename: &str, tx: &Sender<GuiMessage>) {
     tx.send(GuiMessage::Log(LogMessage {
         message: format!("Scanning {}'s browser history for {}'s entries...", &browser.name, dataset_filename),
         level: LogLevel::Info,
@@ -36,7 +36,7 @@ fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_
 
     let browser_config_profile_root = home_dir.join(browser.config_path);
     //get history file of a profile
-    let profile_list_vector = get_profile_list(&browser);
+    let profile_list_vector = get_profile_list(browser);
     let profile_history = browser.history_file;
 
     for folder in profile_list_vector {
@@ -44,7 +44,7 @@ fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_
         //firefox and its forks uses places.sqlite, chrome uses History which is (sqlite3)
         let history_file = browser_config_profile_root
             .join(folder.as_path())
-            .join(&profile_history);
+            .join(profile_history);
         if history_file.is_file() {
             tx.send(GuiMessage::Log(LogMessage {
                 message: format!("Scanning {}...", history_file.display()),
@@ -60,9 +60,9 @@ fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_
 
             match conn.prepare(query) {
                 Ok(mut response) => {
-                    for (i, search) in search_vector.into_iter().enumerate() {
+                    for (i, search) in search_vector.iter().enumerate() {
                         //build search querry
-                        let pattern = format!("%{}%", search);
+                        let pattern = format!("%{search}%");
 
                         //prepare query that will search for stuff and execute it
                         let mut rows = response.query(params![pattern]).expect("Query failed");
@@ -82,8 +82,8 @@ fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_
                             .ok();
                         }
                         tx.send(GuiMessage::Progress(ProgressMessage {
-                            progress: (i + 1) as f32 / search_vector.len() as f32,
-                            progress_total: (i + 1) as f32 / search_vector.len() as f32,
+                            progress: ((i + 1) / search_vector.len()) as f32,
+                            progress_total: ((i + 1) / search_vector.len()) as f32,
                         }))
                         .ok();
                     }
@@ -105,8 +105,7 @@ fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_
                                 tx.send(GuiMessage::Log(
                                             LogMessage{
                                                 message: format!(
-                                                    "Failed to prepare query due to an error: {:#?}. No attempt to scan.",
-                                                    error
+                                                    "Failed to prepare query due to an error: {error}. No attempt to scan.",
                                                 ),
                                                 level: LogLevel::Error,
                                             }
@@ -118,8 +117,7 @@ fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_
                         tx.send(GuiMessage::Log(
                                     LogMessage{
                                         message: format!(
-                                            "Failed to prepare query due to an error: {:#?}. No attempt to scan.",
-                                            error
+                                            "Failed to prepare query due to an error: {error}. No attempt to scan.",
                                         ),
                                         level: LogLevel::Error
                                     }
@@ -128,7 +126,7 @@ fn browser_history_scan(browser: &Browser, search_vector: &Vec<String>, dataset_
                         .ok();
                     }
                 }
-            };
+            }
         } else {
             tx.send(GuiMessage::Log(LogMessage {
                 message: format!(
@@ -154,13 +152,13 @@ fn check_filetype(path: impl AsRef<Path>) -> String {
 // Copying from and to (Un)Verified dir
 fn safely_copy(source: impl AsRef<Path>, destination: impl AsRef<Path>) -> std::io::Result<()> {
     let (source, destination) = (source.as_ref(), destination.as_ref());
-    if !destination.is_file() {
+    if destination.is_file() {
+        //println!("{} already in {}", source.display(), destination.display());
+    } else {
         if !BASE_DIR.join("Verified").is_dir(){
             fs::create_dir_all(BASE_DIR.join("Verified"));
         }
         fs::copy(source, destination)?;
-    } else {
-        //println!("{} already in {}", source.display(), destination.display());
     }
     Ok(())
 }
@@ -182,21 +180,24 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
 
     let home_dir = home_dir().expect("Cannot read $HOME");
 
-    let profile_list_vector = get_profile_list(&browser);
+    let profile_list_vector = get_profile_list(browser);
 
     let browser_cache_profile_root = home_dir.join(browser.cache_path);
     let profile_cache = browser.cache_entries_path;
 
     for folder in profile_list_vector {
-        let folder_cache_path = &browser_cache_profile_root.join(folder).join(&profile_cache);
+        let folder_cache_path = &browser_cache_profile_root.join(folder).join(profile_cache);
 
         if folder_cache_path.is_dir() {
             tx.send(GuiMessage::Log(LogMessage {
-                message: format!("Scanning {:?}", folder_cache_path),
+                message: format!(
+                    "Scanning {}",
+                    folder_cache_path.display()
+                ),
                 level: LogLevel::Info,
             }))
             .ok();
-            if let Ok(cache_entries) = fs::read_dir(&folder_cache_path) {
+            if let Ok(cache_entries) = fs::read_dir(folder_cache_path) {
                 for cache_entry in cache_entries {
                     let cache_entry_path = cache_entry.unwrap().path();
                     //is it a file
@@ -207,7 +208,7 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
                             .to_string_lossy()
                             .into_owned();
                         tx.send(GuiMessage::Log(LogMessage {
-                            message: format!("Checking {}", cache_entry_file_name),
+                            message: format!("Checking {cache_entry_file_name}"),
                             level: LogLevel::Info,
                         }))
                         .ok();
@@ -220,14 +221,14 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
 
                         for (i, asset_data_entry) in asset_data.iter().enumerate() {
                             tx.send(GuiMessage::Progress(ProgressMessage {
-                                progress: (i + 1) as f32 / asset_data.len() as f32,
-                                progress_total: (i + 1) as f32 / asset_data.len() as f32,
+                                progress: ((i + 1) / asset_data.len()) as f32,
+                                progress_total: ((i + 1) / asset_data.len()) as f32,
                             }))
                             .ok();
 
                             if entry_url.contains(asset_data_entry) {
                                 tx.send(GuiMessage::Log(LogMessage {
-                                    message: format!("Found a match! {}", entry_url),
+                                    message: format!("Found a match! {entry_url}"),
                                     level: LogLevel::Good,
                                 }))
                                 .ok();
@@ -276,7 +277,10 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
                 }
             } else {
                 tx.send(GuiMessage::Log(LogMessage {
-                    message: format!("Cannot read folder {:?}", folder_cache_path),
+                    message: format!(
+                        "Cannot read folder {}",
+                        folder_cache_path.display()
+                    ),
                     level: LogLevel::Error,
                 }))
                 .ok();
@@ -284,8 +288,8 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
         } else {
             tx.send(GuiMessage::Log(LogMessage {
                 message: format!(
-                    "No cache folder found in profile {:?}. No attempt to scan.",
-                    folder_cache_path
+                    "No cache folder found in profile {}. No attempt to scan.",
+                    folder_cache_path.display()
                 ),
                 level: LogLevel::Warning,
             }))
@@ -313,22 +317,25 @@ fn browser_cache_video_scan(
 
     let home_dir = home_dir().expect("Cannot read $HOME");
 
-    let profile_list_vector = get_profile_list(&browser);
+    let profile_list_vector = get_profile_list(browser);
 
     let browser_cache_profile_root = home_dir.join(browser.cache_path);
     let profile_cache = browser.cache_entries_path;
 
     for folder in profile_list_vector {
-        let folder_cache_path = &browser_cache_profile_root.join(folder).join(&profile_cache);
+        let folder_cache_path = &browser_cache_profile_root.join(folder).join(profile_cache);
 
         if folder_cache_path.is_dir() {
             tx.send(GuiMessage::Log(LogMessage {
-                message: format!("Scanning {:?}", folder_cache_path),
+                message: format!(
+                    "Scanning {}",
+                    folder_cache_path.display()
+                ),
                 level: LogLevel::Info,
             }))
             .ok();
 
-            if let Ok(cache_entries) = fs::read_dir(&folder_cache_path) {
+            if let Ok(cache_entries) = fs::read_dir(folder_cache_path) {
                 for cache_entry in cache_entries {
                     let cache_entry_path = cache_entry.unwrap().path();
                     //is it a file and a video file
@@ -348,7 +355,7 @@ fn browser_cache_video_scan(
                                 .into_owned();
 
                             tx.send(GuiMessage::Log(LogMessage {
-                                message: format!("Checking {}", cache_entry_file_name),
+                                message: format!("Checking {cache_entry_file_name}"),
                                 level: LogLevel::Info,
                             }))
                             .ok();
@@ -361,15 +368,15 @@ fn browser_cache_video_scan(
                             }
                             fs::create_dir(&potential_file_path).unwrap();
                             let tmp_file = env::temp_dir()
-                                .join(&cache_entry_file_name)
+                                .join(cache_entry_file_name)
                                 .join("frame_%03d.raw");
 
                             extract_videoframes(
-                                PathBuf::from(&cache_entry_path),
-                                PathBuf::from(&tmp_file),
+                                &PathBuf::from(&cache_entry_path),
+                                &PathBuf::from(&tmp_file),
                             );
 
-                            for (i, video_data_entry) in video_data.into_iter().enumerate() {
+                            for (i, video_data_entry) in video_data.iter().enumerate() {
                                 let mut difference = Vec::new();
                                 let mut difference_pack = Vec::new();
                                 for file in fs::read_dir(&potential_file_path).unwrap() {
@@ -383,7 +390,7 @@ fn browser_cache_video_scan(
                                         );
                                         difference.push(result);
                                     }
-                                    match difference.iter().min().cloned() {
+                                    match difference.iter().min().copied() {
                                         //Some(v) => println!(
                                         //	"Closest similarity to {} is {}",
                                         //	&cache_entry_path.to_str().unwrap(),
@@ -399,14 +406,14 @@ fn browser_cache_video_scan(
                                 //                                io::stdout().flush().unwrap();
 
                                 tx.send(GuiMessage::Progress(ProgressMessage {
-                                    progress: (i + 1) as f32 / video_data.len() as f32,
-                                    progress_total: (i + 1) as f32 / video_data.len() as f32,
+                                    progress: ((i + 1) / video_data.len()) as f32,
+                                    progress_total: ((i + 1) / video_data.len()) as f32,
                                 }))
                                 .ok();
 
                                 let difference_final = difference_pack.iter().min().unwrap();
                                 // only if difference is less than or equal to 3
-                                if *difference_final <= 3 as u32 {
+                                if *difference_final <= 3 {
                                     tx.send(GuiMessage::Log(LogMessage {
                                         message: format!(
                                             "Found a match! Closest difference of {:?} is {:?}!",
@@ -417,9 +424,9 @@ fn browser_cache_video_scan(
                                     .ok();
 
                                     let copy_destination =
-                                        BASE_DIR.join("Verified").join(&cache_entry_file_name);
+                                        BASE_DIR.join("Verified").join(cache_entry_file_name);
                                     //println!("{:#?}", copy_destination);
-                                    safely_copy(&cache_entry_path, PathBuf::from(copy_destination))
+                                    safely_copy(&cache_entry_path, copy_destination)
                                         .expect("Couldn't!");
                                 }
                             }
@@ -433,7 +440,10 @@ fn browser_cache_video_scan(
                 }
             } else {
                 tx.send(GuiMessage::Log(LogMessage {
-                    message: format!("Cannot read folder {:?}", folder_cache_path),
+                    message: format!(
+                        "Cannot read folder {}",
+                        folder_cache_path.display()
+                    ),
                     level: LogLevel::Error,
                 }))
                 .ok();
@@ -441,8 +451,8 @@ fn browser_cache_video_scan(
         } else {
             tx.send(GuiMessage::Log(LogMessage {
                 message: format!(
-                    "No cache folder found in profile {:?}. No attempt to scan.",
-                    folder_cache_path
+                    "No cache folder found in profile {}. No attempt to scan.",
+                    folder_cache_path.display()
                 ),
                 level: LogLevel::Warning,
             }))
@@ -451,7 +461,7 @@ fn browser_cache_video_scan(
     }
 }
 
-fn extract_videoframes(input_file: PathBuf, output_file: PathBuf) {
+fn extract_videoframes(input_file: &Path, output_file: &Path) {
     //extracts first frame of video into grayscale 32x32 raw
     let input = input_file.to_str().expect("Invalid input path");
     let output = output_file.to_str().expect("Invalid output path");
@@ -502,12 +512,12 @@ pub fn process(tx: Sender<GuiMessage>) {
     }
 
     //load dataset
-    let dataset = match dataset::load_dataset(BASE_DIR.join("data")) {
+    let dataset = match dataset::load_dataset(&BASE_DIR.join("data")) {
         Ok(dataset) => dataset,
 
-        Err(e) => {
+        Err(err) => {
             tx.send(GuiMessage::Log(LogMessage {
-                message: format!("Failed loading database: {}", e),
+                message: format!("Failed loading database: {err}"),
                 level: LogLevel::Error,
             }))
             .ok();
@@ -517,14 +527,14 @@ pub fn process(tx: Sender<GuiMessage>) {
     };
     for browser in &detected_browsers {
         //search video ids in browser history
-        browser_history_scan(browser, &dataset.history_data, "history_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+        browser_history_scan(browser, &dataset.history, "history_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
     }
     for browser in &detected_browsers {
-        browser_cache_video_scan(browser, &dataset.video_data, "video_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+        browser_cache_video_scan(browser, &dataset.video, "video_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
     }
     for browser in &detected_browsers {
         //search assets in browser cache
-        browser_cache_asset_scan(browser, &dataset.asset_data, "asset_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/
+        browser_cache_asset_scan(browser, &dataset.asset, "asset_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/
     }
     tx.send(GuiMessage::Log(LogMessage {
         message: "Done!".into(),

@@ -176,12 +176,10 @@ pub fn get_profile_list(browser: &Browser) -> Vec<String> {
         BrowserFamily::Gecko => {
             let profiles_list_ini = Ini::load_from_str(&profiles_list_file_content).unwrap();
             for (section, props) in profiles_list_ini.iter() {
-                if let Some(section_name) = section {
-                    if section_name.starts_with("Profile") {
-                        match props.get("Path") {
-                            Some(path) => profile_list_vector.push(path.to_owned()),
-                            None => panic!("Profile section is missing Path value, skipping..."),
-                        }
+                if let Some(section_name) = section && section_name.starts_with("Profile") {
+                    match props.get("Path") {
+                        Some(path) => profile_list_vector.push(path.to_owned()),
+                        None => panic!("Profile section is missing Path value, skipping..."),
                     }
                 }
             }
@@ -192,7 +190,7 @@ pub fn get_profile_list(browser: &Browser) -> Vec<String> {
 
             if let Some(profiles) = profile_list_json["profile"]["info_cache"].as_object() {
                 for (profile_dir, _) in profiles {
-                    profile_list_vector.push(profile_dir.to_owned())
+                    profile_list_vector.push(profile_dir.to_owned());
                 }
             } else {
                 panic!("No profiles found in Local State");

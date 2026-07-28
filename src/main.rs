@@ -12,7 +12,8 @@
 //concentate them
 //
 
-// I wanted to release pre-alpha much earlier but i was bussy in pride month doing real life stuff, sorry guys!
+// I wanted to release pre-alpha much earlier but i was bussy in pride month doing real life stuff, sorry folks!
+#![warn(clippy::pedantic)] // <- lots of fun
 
 mod browsette;
 mod cache2_entry_metadata;
@@ -69,12 +70,12 @@ pub fn main() -> eframe::Result {
     eframe::run_native(
         &format!("Decache-rs {}", env!("DECACHE_VERSION")),
         options,
-        Box::new(|cc| Ok(Box::new(MyApp::default()))),
+        Box::new(|_cc| Ok(Box::new(MyApp::default()))),
     )
 }
 
 impl eframe::App for MyApp {
-    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.request_repaint();
         while let Ok(output) = self.rx.try_recv() {
             match output {
@@ -83,8 +84,8 @@ impl eframe::App for MyApp {
                 }
 
                 GuiMessage::Progress(progress) => {
-                    self.progress = progress.progress as f32;
-                    self.progress_total = progress.progress_total as f32;
+                    self.progress = progress.progress;
+                    self.progress_total = progress.progress_total;
                 }
 
                 GuiMessage::Finished => {

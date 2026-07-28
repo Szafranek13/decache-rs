@@ -4,12 +4,12 @@ use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
 /// This struct is meant consume contents of files in "data" directory
-/// See VideoData for special treatment of video_data.txt
+/// See ``VideoData`` for special treatment of ``video_data.txt``
 pub struct DataSet {
-    pub video_data: Vec<VideoData>,
-    pub watch_page_data: Vec<String>,
-    pub asset_data: Vec<String>,
-    pub history_data: Vec<String>,
+    pub video: Vec<VideoData>,
+    pub watch_page: Vec<String>,
+    pub asset: Vec<String>,
+    pub history: Vec<String>,
 }
 
 ///This struct is meant to consume contents of video_data.txt.
@@ -49,8 +49,8 @@ fn read_lines(path: impl AsRef<Path>) -> Result<Vec<String>, Box<dyn std::error:
     Ok(read_string)
 }
 
-/// Loads all files from "data" directory into fields of DataSet.
-pub fn load_dataset(data_dir: PathBuf) -> Result<DataSet, Box<dyn std::error::Error>> {
+/// Loads all files from "data" directory into fields of ``DataSet``.
+pub fn load_dataset(data_dir: &PathBuf) -> Result<DataSet, Box<dyn std::error::Error>> {
     // Loading dataset
     // Read lines of video_data.txt
     let video_data_path = data_dir.join("video_data.txt");
@@ -81,11 +81,11 @@ pub fn load_dataset(data_dir: PathBuf) -> Result<DataSet, Box<dyn std::error::Er
         let entry_struct = VideoData {
             title: entry_vec[0].to_string(),
             ids: entry_vec[1]
-                .split(",") // split ids by ","
+                .split(',') // split ids by ","
                 .map(|p| p.to_string())
                 .collect(),
             hash: entry_vec[2]
-                .split(",")
+                .split(',')
                 .filter_map(|h| Some(u64::from_str_radix(h, 16).unwrap_or(0)))
                 .collect(),
             duration_min: entry_vec[3].to_string(),
@@ -104,9 +104,9 @@ pub fn load_dataset(data_dir: PathBuf) -> Result<DataSet, Box<dyn std::error::Er
         let history_data = read_lines(history_data_path)?;
 
     Ok(DataSet {
-        video_data: video_data_struct_vec,
-        watch_page_data,
-        asset_data,
-        history_data,
+        video: video_data_struct_vec,
+        watch_page: watch_page_data,
+        asset: asset_data,
+        history: history_data,
     })
 }

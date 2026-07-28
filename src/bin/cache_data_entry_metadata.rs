@@ -42,11 +42,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let fag = EntryHeader{
-        magick: magick,
-        version: version,
-        key_len: key_len,
-        key_hash: key_hash,
-        stream_sizes: stream_sizes
+        magick,
+        version,
+        key_len,
+        key_hash,
+        stream_sizes
     };
 
     //STREAM 0 STARTS HERE
