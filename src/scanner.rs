@@ -14,7 +14,7 @@ use std::{env, fs};
 
 use crate::gui_communication::{GuiMessage, LogMessage, LogLevel, ProgressMessage};
 
-//Constants and statics, mainly paths. LazyLock is a saviour <3
+//Constants and statics, mainly paths.
 //MOVE ALL THOSE TO MATCH FUNCTIONS
 
 static BASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -215,7 +215,7 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
 
                         let entry_url =
                             cache2_entry_metadata::get_metadata(cache_entry_path.to_str().unwrap())
-                                .expect("Unknown problem reading entry's metadata");
+                                .expect("Problem reading entry's metadata");
 
                         //println!("{:?}", entry_url);
 
