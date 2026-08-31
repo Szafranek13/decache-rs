@@ -7,6 +7,7 @@
 // TODO The most important functions (or all of them) should return Result propperly instead of panicing
 // TODO Chrome/Chromium stores cache in a weird format, process it
 // TODO Original skips looking into cache entries that are from web.archive.org
+// TODO Add Options to MyApp struct and pass the value to process()
 
 //The original script seems to copy only MP4 FLV and WEBM video files to Unveryfied
 //It also checks if a video file it found is complete by checking if it has ftyp at the beggining of file
@@ -74,11 +75,9 @@ pub fn main() -> eframe::Result {
     )
 }
 
-
 // Remember your struggle coding gui app in python in tkinter? PREPARE FOR DOUBLE THE PAIN!!!
 
 impl eframe::App for MyApp {
-
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.request_repaint();
         while let Ok(output) = self.rx.try_recv() {
@@ -98,6 +97,46 @@ impl eframe::App for MyApp {
             }
             //self.log.push(LogMessage{message:'\n'.to_string(),level:LogLevel::Info});
         }
+            egui::Panel::bottom("controls").show_inside(ui, |ui| {
+                ui.add(
+                    egui::widgets::ProgressBar::new(self.progress)
+                        .fill(egui::Color32::DARK_BLUE)
+                        .show_percentage(),
+                );
+
+                // ui.add(
+                //     egui::widgets::ProgressBar::new(self.progress_total)
+                //         .fill(egui::Color32::DARK_GREEN)
+                //         .show_percentage(),
+                // );
+
+                ui.horizontal(|ui| {
+                    if ui.add_sized([50.0, 25.0], egui::Button::new("Quit"))
+                        .on_hover_text("Stop and exit").clicked()
+                    {
+                        ui.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add_enabled(
+                                !self.processing,
+                                egui::Button::new("Start").min_size(egui::vec2(50.0, 25.0))
+                            ).on_hover_text("Start scanning")
+                            .clicked()
+                        {
+                            self.processing = true;
+
+                            let tx = self.tx.clone();
+
+                            std::thread::spawn(move || {
+                                process(tx);
+                            });
+                        }
+                    });
+                });
+            });
+
         egui::CentralPanel::default().show_inside(ui, |ui| {
             //main label
             ui.horizontal(|ui| {
@@ -135,7 +174,9 @@ impl eframe::App for MyApp {
             ui.allocate_ui_at_rect(left_rect, |ui| {
                 ui.push_id("log_area", |ui| {
                     ui.label("Log output");
-                    egui::Frame::NONE.fill(egui::Color32::BLACK).show(ui, |ui| {
+                    egui::Frame::NONE.fill(egui::Color32::from_hex("#0D0D0D").unwrap())
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::DARK_GRAY))
+                        .show(ui, |ui| {
                         ui.set_min_size(ui.available_size());
 
                         egui::ScrollArea::vertical()
@@ -166,49 +207,14 @@ impl eframe::App for MyApp {
             ui.allocate_ui_at_rect(right_rect, |ui| {
                 ui.push_id("option_area", |ui| {
                     ui.label("Options");
-                    let mut booly: bool = true;
-                    ui.checkbox(&mut booly, "Scan browser video cache");
-                    ui.checkbox(&mut booly, "Scan browser asset cache");
-                    ui.checkbox(&mut booly, "Scan browser history");
-                });
-            });
-            egui::Panel::bottom("controls").show_inside(ui, |ui| {
-                ui.add(
-                    egui::widgets::ProgressBar::new(self.progress)
-                        .fill(egui::Color32::DARK_BLUE)
-                        .show_percentage(),
-                );
-
-                // ui.add(
-                //     egui::widgets::ProgressBar::new(self.progress_total)
-                //         .fill(egui::Color32::DARK_GREEN)
-                //         .show_percentage(),
-                // );
-
-                ui.horizontal(|ui| {
-                    if ui
-                        .add_sized([50.0, 25.0], egui::Button::new("Quit"))
-                        .clicked()
-                    {
-                        ui.send_viewport_cmd(egui::ViewportCommand::Close);
-                    }
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .add_enabled(
-                                !self.processing,
-                                egui::Button::new("Start").min_size(egui::vec2(50.0, 25.0)),
-                            )
-                            .clicked()
-                        {
-                            self.processing = true;
-
-                            let tx = self.tx.clone();
-
-                            std::thread::spawn(move || {
-                                process(tx);
-                            });
-                        }
+                    egui::Frame::NONE.fill(egui::Color32::TRANSPARENT)
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::DARK_GRAY))
+                    .show(ui, |ui| {
+                        ui.set_min_size(ui.available_size());
+                        let mut booly: bool = true;
+                        ui.checkbox(&mut booly, "Scan browser video cache").on_hover_text("Scan your browsers' cache folders for video files");
+                        ui.checkbox(&mut booly, "Scan browser asset cache").on_hover_text("Scan your browsers' cache folders for other files");
+                        ui.checkbox(&mut booly, "Scan browser history").on_hover_text("Scan your browsers' history of visited webpages");
                     });
                 });
             });
