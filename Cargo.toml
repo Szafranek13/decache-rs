@@ -29,3 +29,4 @@ rust-ini = "0.21.3"
 byteorder = "1.5.0"
 #ui
 eframe = "0.34.3"
+urlencoding = "2.1.3"

@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::{env, fs};
 
-use crate::gui_communication::{GuiMessage, LogMessage, LogLevel, ProgressMessage};
+use crate::gui_communication::{GuiMessage, LogLevel, LogMessage, ProgressMessage};
 
 //Constants and statics, mainly paths.
 //MOVE ALL THOSE TO MATCH FUNCTIONS
@@ -26,9 +26,17 @@ static BASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     path
 });
 
-fn browser_history_scan(browser: &Browser, search_vector: &[String], dataset_filename: &str, tx: &Sender<GuiMessage>) {
+fn browser_history_scan(
+    browser: &Browser,
+    search_vector: &[String],
+    dataset_filename: &str,
+    tx: &Sender<GuiMessage>,
+) {
     tx.send(GuiMessage::Log(LogMessage {
-        message: format!("Scanning {}'s browser history for {}'s entries...", &browser.name, dataset_filename),
+        message: format!(
+            "Scanning {}'s browser history for {}'s entries...",
+            &browser.name, dataset_filename
+        ),
         level: LogLevel::Info,
     }))
     .ok();
@@ -155,7 +163,7 @@ fn safely_copy(source: impl AsRef<Path>, destination: impl AsRef<Path>) -> std::
     if destination.is_file() {
         //println!("{} already in {}", source.display(), destination.display());
     } else {
-        if !BASE_DIR.join("Verified").is_dir(){
+        if !BASE_DIR.join("Verified").is_dir() {
             fs::create_dir_all(BASE_DIR.join("Verified"));
         }
         fs::copy(source, destination)?;
@@ -167,12 +175,16 @@ fn check_if_video_stream_is_complete() {
     todo!();
 }
 
-fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_filename: &str, tx : &Sender<GuiMessage>) {
+fn browser_cache_asset_scan(
+    browser: &Browser,
+    asset_data: &[String],
+    dataset_filename: &str,
+    tx: &Sender<GuiMessage>,
+) {
     tx.send(GuiMessage::Log(LogMessage {
         message: format!(
             "Scanning {}'s cache for {}'s entries...",
-            browser.name,
-            dataset_filename
+            browser.name, dataset_filename
         ),
         level: LogLevel::Info,
     }))
@@ -190,10 +202,7 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
 
         if folder_cache_path.is_dir() {
             tx.send(GuiMessage::Log(LogMessage {
-                message: format!(
-                    "Scanning {}",
-                    folder_cache_path.display()
-                ),
+                message: format!("Scanning {}", folder_cache_path.display()),
                 level: LogLevel::Info,
             }))
             .ok();
@@ -277,10 +286,7 @@ fn browser_cache_asset_scan(browser: &Browser, asset_data: &[String], dataset_fi
                 }
             } else {
                 tx.send(GuiMessage::Log(LogMessage {
-                    message: format!(
-                        "Cannot read folder {}",
-                        folder_cache_path.display()
-                    ),
+                    message: format!("Cannot read folder {}", folder_cache_path.display()),
                     level: LogLevel::Error,
                 }))
                 .ok();
@@ -308,8 +314,7 @@ fn browser_cache_video_scan(
     tx.send(GuiMessage::Log(LogMessage {
         message: format!(
             "Scanning {}'s cache for {} entries...",
-            browser.name,
-            dataset_filename
+            browser.name, dataset_filename
         ),
         level: LogLevel::Info,
     }))
@@ -327,10 +332,7 @@ fn browser_cache_video_scan(
 
         if folder_cache_path.is_dir() {
             tx.send(GuiMessage::Log(LogMessage {
-                message: format!(
-                    "Scanning {}",
-                    folder_cache_path.display()
-                ),
+                message: format!("Scanning {}", folder_cache_path.display()),
                 level: LogLevel::Info,
             }))
             .ok();
@@ -344,7 +346,8 @@ fn browser_cache_video_scan(
 
                         let filetype = check_filetype(&cache_entry_path);
 
-                        if ["mp4", "webm", "flv"].contains(&filetype.as_str()) { // Shitty solution! Chromium's cache entry (unlike Firefox's) is not just an mp4 with metadata appended!! TODO Change it to i don't fucking know what...
+                        if ["mp4", "webm", "flv"].contains(&filetype.as_str()) {
+                            // Shitty solution! Chromium's cache entry (unlike Firefox's) is not just an mp4 with metadata appended!! TODO Change it to i don't fucking know what...
                             //|| infer::is_image(&buf){
                             //println!("{:?}", cache_entry_path);
                             //extract frame and gen hash
@@ -440,10 +443,7 @@ fn browser_cache_video_scan(
                 }
             } else {
                 tx.send(GuiMessage::Log(LogMessage {
-                    message: format!(
-                        "Cannot read folder {}",
-                        folder_cache_path.display()
-                    ),
+                    message: format!("Cannot read folder {}", folder_cache_path.display()),
                     level: LogLevel::Error,
                 }))
                 .ok();
@@ -505,7 +505,10 @@ pub fn process(tx: Sender<GuiMessage>) {
     .ok();
     for browser in &detected_browsers {
         tx.send(GuiMessage::Log(LogMessage {
-            message: format!("\t{} at {} & {}", browser.name, browser.config_path, browser.cache_path),
+            message: format!(
+                "\t{} at {} & {}",
+                browser.name, browser.config_path, browser.cache_path
+            ),
             level: LogLevel::Info,
         }))
         .ok();

@@ -89,9 +89,8 @@ impl CacheEntry {
 
         let key = data[key_start..key_end].to_vec();
 
-        
-         //The last EOF belongs to Stream 0.
-         
+        //The last EOF belongs to Stream 0.
+
         let final_eof_offset = data.len() - EOF_SIZE;
 
         let stream0_eof = parse_eof(data, final_eof_offset)?;
@@ -103,8 +102,8 @@ impl CacheEntry {
             ));
         }
 
-         //FLAG_HAS_KEY_SHA256 = bit 1.
-         
+        //FLAG_HAS_KEY_SHA256 = bit 1.
+
         let has_sha256 = (stream0_eof.flags & 2) != 0;
 
         let sha_start = if has_sha256 {
@@ -121,10 +120,10 @@ impl CacheEntry {
             None
         };
 
-         //END OF STREAM 0 and then
-         //optional SHA256
-         //EOF OF STREAM 0
-         
+        //END OF STREAM 0 and then
+        //optional SHA256
+        //EOF OF STREAM 0
+
         let stream0_end = sha_start;
 
         let stream0_size = stream0_eof.stream_size as usize;
@@ -157,7 +156,6 @@ impl CacheEntry {
             ));
         }
 
-        
         //STREAM 1 begins after the key
         let stream1_start = key_end;
         let stream1_end = stream1_eof_offset;
@@ -218,7 +216,7 @@ fn read_u64(data: &[u8], offset: usize) -> io::Result<u64> {
     Ok(u64::from_le_bytes(bytes.try_into().unwrap()))
 }
 
- //Extract printable ASCII strings among the garbage
+//Extract printable ASCII strings among the garbage
 fn printable_strings(data: &[u8]) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = Vec::new();
@@ -246,7 +244,7 @@ fn printable_strings(data: &[u8]) -> Vec<String> {
     result
 }
 
- //Find ALL HTTP and HTTPS URLs inside those bytes
+//Find ALL HTTP and HTTPS URLs inside those bytes
 fn find_urls(data: &[u8]) -> Vec<String> {
     let mut urls = Vec::new();
     let mut i = 0;
@@ -268,35 +266,10 @@ fn find_urls(data: &[u8]) -> Vec<String> {
         while i < data.len() {
             let c = data[i];
 
-            let valid = matches!(
-                c,
-                b'a'..=b'z'
-                    | b'A'..=b'Z'
-                    | b'0'..=b'9'
-                    | b'-'
-                    | b'_'
-                    | b'.'
-                    | b'/'
-                    | b':'
-                    | b'?'
-                    | b'='
-                    | b'&'
-                    | b'%'
-                    | b'#'
-                    | b'~'
-                    | b'@'
-                    | b'+'
-                    | b'!'
-                    | b'$'
-                    | b'\''
-                    | b'('
-                    | b')'
-                    | b'*'
-                    | b','
-                    | b';'
-                    | b'['
-                    | b']'
-            );
+            const VALID_CHARS: &[u8] =
+                b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./:?=&%#~@+!$'()*,;[]";
+
+            let valid = VALID_CHARS.contains(&c);
 
             if !valid {
                 break;
@@ -306,10 +279,19 @@ fn find_urls(data: &[u8]) -> Vec<String> {
         }
 
         if let Ok(url) = std::str::from_utf8(&data[start..i]) {
-            urls.push(url.to_owned());
+            if !url.is_empty() {
+                let decoded = match decode_proxy_url(url) {
+                    Some(decoded) => decoded,
+                    None => url.to_string(),
+                };
+
+                urls.push(decoded);
+            }
         }
     }
 
+    urls.sort_unstable();
+    urls.dedup();
     urls
 }
 
@@ -340,7 +322,7 @@ fn extract_content_type(stream0: &[u8]) -> Option<String> {
     None
 }
 
-fn decoded_proxy_url(url: &str) -> Option<String> {
+fn decode_proxy_url(url: &str) -> Option<String> {
     let marker = "?u=";
 
     let pos = url.find(marker)?;
@@ -400,29 +382,6 @@ fn print_hex_preview(data: &[u8]) {
     println!();
 }
 
-fn print_stream_urls(stream_name: &str, data: &[u8]) {
-    let urls = find_urls(data);
-
-    println!();
-    println!("URLS found in {}:", stream_name);
-
-    if urls.is_empty() {
-        println!("\t<none>");
-        return;
-    }
-
-    for url in &urls {
-        println!("\t\t{}", url);
-
-        if let Some(source) = decoded_proxy_url(url) {
-            if source != *url {
-                println!("\tDecoded source URL:");
-                println!("\t\t{}", source);
-            }
-        }
-    }
-}
-
 fn print_stream_strings(stream_name: &str, data: &[u8]) {
     let strings = printable_strings(data);
 
@@ -455,11 +414,23 @@ fn print_data_information(stream_name: &str, data: &[u8]) {
 
     print_hex_preview(data);
 
-    print_stream_urls(stream_name, data);
+    //print_stream_urls(stream_name, data);
 
     print_stream_strings(stream_name, data);
 }
 
+pub fn parse_entry(path: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let data = fs::read(path)?;
+    let main_entry = CacheEntry::parse(&data);
+    if let Ok(entry) = main_entry {
+        //decode_proxy_url()
+        Ok(find_urls(&entry.key))
+    } else {
+        Err("FUCK!".into())
+    }
+}
+
+/*
 fn parse_datacache(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let data = fs::read(path)?;
 
@@ -524,7 +495,7 @@ fn parse_datacache(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         print_stream_urls("Stream 0", &entry.stream0);
 
         print_stream_strings("Stream 0", &entry.stream0);
-        
+
         // STREAM 1
         println!("Stream 1");
 
@@ -533,18 +504,20 @@ fn parse_datacache(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let detected = check_filetype(&entry.stream1);
 
         //let output = write_recovered_file(path, 1, &entry.stream1, detected)?;
-        
+
         return Ok(());
     } else {
         panic!("FUCKING SHIT");
     }
 }
+*/
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let argument = env::args()
-        .nth(1).ok_or("you just stupid")?;
+    let argument = env::args().nth(1).ok_or("you just stupid")?;
 
     let path = PathBuf::from(argument);
 
-    parse_datacache(&path)
+    let a = parse_entry(&path)?;
+    println!("{:?}", a);
+    Ok(())
 }

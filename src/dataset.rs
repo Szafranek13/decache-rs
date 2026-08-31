@@ -101,7 +101,7 @@ pub fn load_dataset(data_dir: &PathBuf) -> Result<DataSet, Box<dyn std::error::E
     let asset_data = read_lines(asset_data_path)?;
 
     let history_data_path = data_dir.join("history_data.txt");
-        let history_data = read_lines(history_data_path)?;
+    let history_data = read_lines(history_data_path)?;
 
     Ok(DataSet {
         video: video_data_struct_vec,

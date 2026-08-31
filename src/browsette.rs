@@ -9,7 +9,6 @@ use serde_json::Value;
 use std::fmt;
 use std::fs;
 
-
 /// Struct for browser data
 #[derive(Debug)]
 pub struct Browser {
@@ -176,7 +175,9 @@ pub fn get_profile_list(browser: &Browser) -> Vec<String> {
         BrowserFamily::Gecko => {
             let profiles_list_ini = Ini::load_from_str(&profiles_list_file_content).unwrap();
             for (section, props) in profiles_list_ini.iter() {
-                if let Some(section_name) = section && section_name.starts_with("Profile") {
+                if let Some(section_name) = section
+                    && section_name.starts_with("Profile")
+                {
                     match props.get("Path") {
                         Some(path) => profile_list_vector.push(path.to_owned()),
                         None => panic!("Profile section is missing Path value, skipping..."),

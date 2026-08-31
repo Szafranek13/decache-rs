@@ -1,6 +1,8 @@
 //No AI was used to write this program, I have alergy to ai slop.
 //Also, i learned rust like 1 year ago, so this probably can be optimised
 
+//For now main.rs contains the main gui stuff that starts the main scanning function.
+
 // TODO Do something about the ffmpeg bottlneck maybe... maybe it could process multiple files in one process instead of calling ffmpeg everytime
 // TODO The most important functions (or all of them) should return Result propperly instead of panicing
 // TODO Chrome/Chromium stores cache in a weird format, process it
@@ -10,9 +12,7 @@
 //It also checks if a video file it found is complete by checking if it has ftyp at the beggining of file
 //if it doesnt then it's not a first piece of a video, but the middle or the final, and then it
 //concentate them
-//
 
-// I wanted to release pre-alpha much earlier but i was bussy in pride month doing real life stuff, sorry folks!
 #![warn(clippy::pedantic)] // <- lots of fun
 
 mod browsette;
@@ -62,7 +62,7 @@ pub fn main() -> eframe::Result {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([720.0, 480.0])
+            .with_inner_size([800.0, 600.0])
             .with_icon(icon),
         ..Default::default()
     };
@@ -74,7 +74,11 @@ pub fn main() -> eframe::Result {
     )
 }
 
+
+// Remember your struggle coding gui app in python in tkinter? PREPARE FOR DOUBLE THE PAIN!!!
+
 impl eframe::App for MyApp {
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.request_repaint();
         while let Ok(output) = self.rx.try_recv() {
@@ -108,7 +112,66 @@ impl eframe::App for MyApp {
                 ui.label(egui::RichText::new("for"));
                 ui.label(egui::RichText::new(env!("BUILD_TARGET")).color(egui::Color32::CYAN));
             });
+            ui.add(egui::Separator::default().spacing(4.0));
 
+            //egui::Frame::canvas(ui.style()).fill(egui::Color32::TRANSPARENT).show(ui, |ui| {
+            //ui.set_height(ui.available_height()); //VERY WRONG THING TO DO //hello this is future me, why is it wrong? i forgor why ;-;
+            //ui.set_width(ui.available_width());
+            let available = ui.available_rect_before_wrap();
+
+            let right_width = available.width() / 4.0;
+            let left_width = available.width() - right_width;
+
+            let left_rect = egui::Rect::from_min_size(
+                available.min,
+                egui::vec2(left_width, available.height()),
+            );
+
+            let right_rect = egui::Rect::from_min_size(
+                egui::pos2(available.min.x + left_width, available.min.y),
+                egui::vec2(right_width, available.height()),
+            );
+
+            ui.allocate_ui_at_rect(left_rect, |ui| {
+                ui.push_id("log_area", |ui| {
+                    ui.label("Log output");
+                    egui::Frame::NONE.fill(egui::Color32::BLACK).show(ui, |ui| {
+                        ui.set_min_size(ui.available_size());
+
+                        egui::ScrollArea::vertical()
+                            .stick_to_bottom(true)
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                for entry in &self.log {
+                                    match entry.level {
+                                        LogLevel::Info => {
+                                            ui.label(&entry.message);
+                                        }
+                                        LogLevel::Warning => {
+                                            ui.colored_label(egui::Color32::YELLOW, &entry.message);
+                                        }
+                                        LogLevel::Error => {
+                                            ui.colored_label(egui::Color32::RED, &entry.message);
+                                        }
+                                        LogLevel::Good => {
+                                            ui.colored_label(egui::Color32::GREEN, &entry.message);
+                                        }
+                                    }
+                                }
+                            });
+                    });
+                });
+            });
+
+            ui.allocate_ui_at_rect(right_rect, |ui| {
+                ui.push_id("option_area", |ui| {
+                    ui.label("Options");
+                    let mut booly: bool = true;
+                    ui.checkbox(&mut booly, "Scan browser video cache");
+                    ui.checkbox(&mut booly, "Scan browser asset cache");
+                    ui.checkbox(&mut booly, "Scan browser history");
+                });
+            });
             egui::Panel::bottom("controls").show_inside(ui, |ui| {
                 ui.add(
                     egui::widgets::ProgressBar::new(self.progress)
@@ -148,35 +211,6 @@ impl eframe::App for MyApp {
                         }
                     });
                 });
-            });
-
-            egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                ui.set_height(ui.available_height()); //VERY WRONG THING TO DO
-                ui.set_width(ui.available_width());
-                egui::ScrollArea::vertical()
-                    .stick_to_bottom(true)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        for entry in &self.log {
-                            match entry.level {
-                                LogLevel::Info => {
-                                    ui.label(&entry.message);
-                                }
-
-                                LogLevel::Warning => {
-                                    ui.colored_label(egui::Color32::YELLOW, &entry.message);
-                                }
-
-                                LogLevel::Error => {
-                                    ui.colored_label(egui::Color32::RED, &entry.message);
-                                }
-
-                                LogLevel::Good => {
-                                    ui.colored_label(egui::Color32::GREEN, &entry.message);
-                                }
-                            }
-                        }
-                    });
             });
         });
     }
