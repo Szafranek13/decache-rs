@@ -29,3 +29,21 @@ pub struct ProgressMessage {
     pub progress: f32,
     pub progress_total: f32,
 }
+
+/// Struct of the app options. It is set by the options panel in egui and then passed to `scanner.rs`
+#[derive(Copy, Clone)]
+pub struct Options {
+    pub scan_video: bool,
+    pub scan_assets: bool,
+    pub scan_history: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            scan_video: true,
+            scan_assets: true,
+            scan_history: true,
+        }
+    }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "decache-rs"
-version = "0.0.1"
+version = "0.1.3"
 edition = "2024"
 
 [profile.release]
@@ -13,20 +13,20 @@ chrono = "*"
 [dependencies]
 walkdir = "2"
 dirs = "6.0.0"
-rusqlite = { version = "0.39", features = ["bundled"] }
-infer = "0.19.0"
+rusqlite = { version = "0.40", features = ["bundled"] }
+infer = "0.22.0"
+urlencoding = "2.1.3"
 #image operations and hashing
-ffmpeg-sidecar = "2.5.1"
+ffmpeg-sidecar = "2.5.2"
 img_hash = "3.2"
-image = { version = "0.23.14", features = ["png"] }
+image = { version = "0.25.10", features = ["png"] }
 #other
 tokio = { version = "1", features = ["full"] }
 reqwest = "0.13.4"
 chrome-cache-parser = "0.2.5"
 #file parsing
-serde_json = "1.0.150"
+serde_json = "1.0.151"
 rust-ini = "0.21.3"
 byteorder = "1.5.0"
 #ui
-eframe = "0.34.3"
-urlencoding = "2.1.3"
+eframe = "0.36.1"

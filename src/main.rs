@@ -25,18 +25,21 @@ mod scanner;
 use crate::scanner::process;
 use eframe::egui;
 
-mod gui_communication;
-use crate::gui_communication::*;
+mod gui_shared;
+//use crate::gui_communication::*;
+//use crate::gui_communication;
 
 use std::sync::mpsc::{self, Receiver, Sender};
 
 struct MyApp {
-    log: Vec<LogMessage>,
+    log: Vec<gui_shared::LogMessage>,
     progress: f32,
     progress_total: f32,
-    rx: Receiver<GuiMessage>,
-    tx: Sender<GuiMessage>,
+    rx: Receiver<gui_shared::GuiMessage>,
+    tx: Sender<gui_shared::GuiMessage>,
     processing: bool,
+    
+    options: gui_shared::Options,
 }
 
 impl Default for MyApp {
@@ -44,18 +47,20 @@ impl Default for MyApp {
         let (tx, rx) = mpsc::channel();
 
         Self {
-            log: vec![LogMessage {
+            log: vec![gui_shared::LogMessage {
                 message: "Press Start to start!\n".to_string(),
-                level: LogLevel::Info,
+                level: gui_shared::LogLevel::Info,
             }],
             progress: 0.0,
             progress_total: 0.0,
             rx,
             tx,
             processing: false,
+            options: gui_shared::Options::default()
         }
     }
 }
+
 
 pub fn main() -> eframe::Result {
     //    egui_logger::builder().init().unwrap();
@@ -64,6 +69,7 @@ pub fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([800.0, 600.0])
+            .with_min_inner_size([640.0, 480.0])
             .with_icon(icon),
         ..Default::default()
     };
@@ -82,60 +88,63 @@ impl eframe::App for MyApp {
         ui.request_repaint();
         while let Ok(output) = self.rx.try_recv() {
             match output {
-                GuiMessage::Log(log) => {
+                gui_shared::GuiMessage::Log(log) => {
                     self.log.push(log);
                 }
 
-                GuiMessage::Progress(progress) => {
+                gui_shared::GuiMessage::Progress(progress) => {
                     self.progress = progress.progress;
                     self.progress_total = progress.progress_total;
                 }
 
-                GuiMessage::Finished => {
+                gui_shared::GuiMessage::Finished => {
                     self.processing = false;
                 }
             }
             //self.log.push(LogMessage{message:'\n'.to_string(),level:LogLevel::Info});
         }
-            egui::Panel::bottom("controls").show_inside(ui, |ui| {
-                ui.add(
-                    egui::widgets::ProgressBar::new(self.progress)
-                        .fill(egui::Color32::DARK_BLUE)
-                        .show_percentage(),
-                );
+        egui::Panel::bottom("controls").show_inside(ui, |ui| {
+            ui.add(
+                egui::widgets::ProgressBar::new(self.progress)
+                    .fill(egui::Color32::DARK_BLUE)
+                    .show_percentage(),
+            );
 
-                // ui.add(
-                //     egui::widgets::ProgressBar::new(self.progress_total)
-                //         .fill(egui::Color32::DARK_GREEN)
-                //         .show_percentage(),
-                // );
+            // ui.add(
+            //     egui::widgets::ProgressBar::new(self.progress_total)
+            //         .fill(egui::Color32::DARK_GREEN)
+            //         .show_percentage(),
+            // );
 
-                ui.horizontal(|ui| {
-                    if ui.add_sized([50.0, 25.0], egui::Button::new("Quit"))
-                        .on_hover_text("Stop and exit").clicked()
+            ui.horizontal(|ui| {
+                if ui
+                    .add_sized([50.0, 25.0], egui::Button::new("Quit"))
+                    .on_hover_text("Stop what the program is doing and exit")
+                    .clicked()
+                {
+                    ui.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add_enabled(
+                            !self.processing,
+                            egui::Button::new("Start").min_size(egui::vec2(50.0, 25.0)),
+                        )
+                        .on_hover_text("Start scanning")
+                        .clicked()
                     {
-                        ui.send_viewport_cmd(egui::ViewportCommand::Close);
+                        self.processing = true;
+
+                        let tx = self.tx.clone();
+                        let options = self.options.clone();
+                        std::thread::spawn(move || {
+                            process(tx, options);
+                        });
                     }
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .add_enabled(
-                                !self.processing,
-                                egui::Button::new("Start").min_size(egui::vec2(50.0, 25.0))
-                            ).on_hover_text("Start scanning")
-                            .clicked()
-                        {
-                            self.processing = true;
-
-                            let tx = self.tx.clone();
-
-                            std::thread::spawn(move || {
-                                process(tx);
-                            });
-                        }
-                    });
                 });
             });
+        });
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
             //main label
@@ -150,6 +159,7 @@ impl eframe::App for MyApp {
                 ui.label(egui::RichText::new(env!("BUILD_DATE")).color(egui::Color32::YELLOW));
                 ui.label(egui::RichText::new("for"));
                 ui.label(egui::RichText::new(env!("BUILD_TARGET")).color(egui::Color32::CYAN));
+                //ui.global_theme_preference_switch();
             });
             ui.add(egui::Separator::default().spacing(4.0));
 
@@ -170,8 +180,8 @@ impl eframe::App for MyApp {
                 egui::pos2(available.min.x + left_width, available.min.y),
                 egui::vec2(right_width, available.height()),
             );
-
-            ui.allocate_ui_at_rect(left_rect, |ui| {
+            
+            ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
                 ui.push_id("log_area", |ui| {
                     ui.label("Log output");
                     egui::Frame::NONE.fill(egui::Color32::from_hex("#0D0D0D").unwrap())
@@ -185,16 +195,16 @@ impl eframe::App for MyApp {
                             .show(ui, |ui| {
                                 for entry in &self.log {
                                     match entry.level {
-                                        LogLevel::Info => {
+                                        gui_shared::LogLevel::Info => {
                                             ui.label(&entry.message);
                                         }
-                                        LogLevel::Warning => {
+                                        gui_shared::LogLevel::Warning => {
                                             ui.colored_label(egui::Color32::YELLOW, &entry.message);
                                         }
-                                        LogLevel::Error => {
+                                        gui_shared::LogLevel::Error => {
                                             ui.colored_label(egui::Color32::RED, &entry.message);
                                         }
-                                        LogLevel::Good => {
+                                        gui_shared::LogLevel::Good => {
                                             ui.colored_label(egui::Color32::GREEN, &entry.message);
                                         }
                                     }
@@ -203,18 +213,32 @@ impl eframe::App for MyApp {
                     });
                 });
             });
-
-            ui.allocate_ui_at_rect(right_rect, |ui| {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(right_rect), |ui| {
                 ui.push_id("option_area", |ui| {
                     ui.label("Options");
                     egui::Frame::NONE.fill(egui::Color32::TRANSPARENT)
                     .stroke(egui::Stroke::new(1.0, egui::Color32::DARK_GRAY))
                     .show(ui, |ui| {
                         ui.set_min_size(ui.available_size());
-                        let mut booly: bool = true;
-                        ui.checkbox(&mut booly, "Scan browser video cache").on_hover_text("Scan your browsers' cache folders for video files");
-                        ui.checkbox(&mut booly, "Scan browser asset cache").on_hover_text("Scan your browsers' cache folders for other files");
-                        ui.checkbox(&mut booly, "Scan browser history").on_hover_text("Scan your browsers' history of visited webpages");
+                        ui.label(
+                            egui::RichText::new("ℹ The more you enable, the higher the chance of finding.")
+                                .color(egui::Color32::from_rgb(0, 100, 200))
+                            );
+                        ui.add_enabled(
+                            !self.processing,
+                            egui::Checkbox::new(&mut self.options.scan_video, "Scan browser video cache")
+                        )
+                        .on_hover_text("Scans your browsers' cache folders for video files, then compares hashes of their frames to hashes in the database");
+                        ui.add_enabled(
+                            !self.processing,
+                            egui::Checkbox::new(&mut self.options.scan_assets, "Scan browser asset cache")
+                        )
+                        .on_hover_text("Scans your browsers' cache folders for other files, then checks if urls they've been cached from are in the database");
+                        ui.add_enabled(
+                            !self.processing,
+                            egui::Checkbox::new(&mut self.options.scan_history, "Scan browser history")
+                        )
+                        .on_hover_text("Scans your browsers' history for urls in the databse");
                     });
                 });
             });

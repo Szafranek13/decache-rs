@@ -12,8 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::{env, fs};
 
-use crate::gui_communication::{GuiMessage, LogLevel, LogMessage, ProgressMessage};
-
+use crate::gui_shared;
 //Constants and statics, mainly paths.
 //MOVE ALL THOSE TO MATCH FUNCTIONS
 
@@ -30,14 +29,14 @@ fn browser_history_scan(
     browser: &Browser,
     search_vector: &[String],
     dataset_filename: &str,
-    tx: &Sender<GuiMessage>,
+    tx: &Sender<gui_shared::GuiMessage>,
 ) {
-    tx.send(GuiMessage::Log(LogMessage {
+    tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: format!(
             "Scanning {}'s browser history for {}'s entries...",
             &browser.name, dataset_filename
         ),
-        level: LogLevel::Info,
+        level: gui_shared::LogLevel::Info,
     }))
     .ok();
     let home_dir = home_dir().expect("No $HOME dir");
@@ -54,9 +53,9 @@ fn browser_history_scan(
             .join(folder.as_path())
             .join(profile_history);
         if history_file.is_file() {
-            tx.send(GuiMessage::Log(LogMessage {
+            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                 message: format!("Scanning {}...", history_file.display()),
-                level: LogLevel::Info,
+                level: gui_shared::LogLevel::Info,
             }))
             .ok();
             let conn = Connection::open(history_file).expect("Cannot open history database");
@@ -79,17 +78,17 @@ fn browser_history_scan(
                         while let Some(row) = rows.next().expect("Failed to fetch row") {
                             let url: Option<String> = row.get(0).unwrap_or_default();
                             let title: Option<String> = row.get(1).unwrap_or_default();
-                            tx.send(GuiMessage::Log(LogMessage {
+                            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                                 message: format!(
                                     "Found: url: {}, title:{}!",
                                     url.unwrap_or_default(),
                                     title.unwrap_or_default()
                                 ),
-                                level: LogLevel::Good,
+                                level: gui_shared::LogLevel::Good,
                             }))
                             .ok();
                         }
-                        tx.send(GuiMessage::Progress(ProgressMessage {
+                        tx.send(gui_shared::GuiMessage::Progress(gui_shared::ProgressMessage {
                             progress: ((i + 1) / search_vector.len()) as f32,
                             progress_total: ((i + 1) / search_vector.len()) as f32,
                         }))
@@ -100,34 +99,34 @@ fn browser_history_scan(
                     if let rusqlite::Error::SqliteFailure(err, _) = error {
                         match err.code {
                             rusqlite::ErrorCode::DatabaseBusy => {
-                                tx.send(GuiMessage::Log(
-                                            LogMessage{
+                                tx.send(gui_shared::GuiMessage::Log(
+                                            gui_shared::LogMessage{
                                                 message: "The browser history database is locked, perhaps the browser is still running? Close it first. No attempt to scan."
                                                 .into(),
-                                                level: LogLevel::Error,
+                                                level: gui_shared::LogLevel::Error,
                                             }
                                         )
                                 ).ok();
                             }
                             _ => {
-                                tx.send(GuiMessage::Log(
-                                            LogMessage{
+                                tx.send(gui_shared::GuiMessage::Log(
+                                            gui_shared::LogMessage{
                                                 message: format!(
                                                     "Failed to prepare query due to an error: {error}. No attempt to scan.",
                                                 ),
-                                                level: LogLevel::Error,
+                                                level: gui_shared::LogLevel::Error,
                                             }
                                         )
                                 ).ok();
                             }
                         }
                     } else {
-                        tx.send(GuiMessage::Log(
-                                    LogMessage{
+                        tx.send(gui_shared::GuiMessage::Log(
+                                    gui_shared::LogMessage{
                                         message: format!(
                                             "Failed to prepare query due to an error: {error}. No attempt to scan.",
                                         ),
-                                        level: LogLevel::Error
+                                        level: gui_shared::LogLevel::Error
                                     }
                                 )
                         )
@@ -136,12 +135,12 @@ fn browser_history_scan(
                 }
             }
         } else {
-            tx.send(GuiMessage::Log(LogMessage {
+            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                 message: format!(
                     "{} does not exists. No attempt to scan",
                     history_file.display(),
                 ),
-                level: LogLevel::Warning,
+                level: gui_shared::LogLevel::Warning,
             }))
             .ok();
         }
@@ -179,14 +178,14 @@ fn browser_cache_asset_scan(
     browser: &Browser,
     asset_data: &[String],
     dataset_filename: &str,
-    tx: &Sender<GuiMessage>,
+    tx: &Sender<gui_shared::GuiMessage>,
 ) {
-    tx.send(GuiMessage::Log(LogMessage {
+    tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: format!(
             "Scanning {}'s cache for {}'s entries...",
             browser.name, dataset_filename
         ),
-        level: LogLevel::Info,
+        level: gui_shared::LogLevel::Info,
     }))
     .ok();
 
@@ -201,9 +200,9 @@ fn browser_cache_asset_scan(
         let folder_cache_path = &browser_cache_profile_root.join(folder).join(profile_cache);
 
         if folder_cache_path.is_dir() {
-            tx.send(GuiMessage::Log(LogMessage {
+            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                 message: format!("Scanning {}", folder_cache_path.display()),
-                level: LogLevel::Info,
+                level: gui_shared::LogLevel::Info,
             }))
             .ok();
             if let Ok(cache_entries) = fs::read_dir(folder_cache_path) {
@@ -216,9 +215,9 @@ fn browser_cache_asset_scan(
                             .unwrap()
                             .to_string_lossy()
                             .into_owned();
-                        tx.send(GuiMessage::Log(LogMessage {
+                        tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                             message: format!("Checking {cache_entry_file_name}"),
-                            level: LogLevel::Info,
+                            level: gui_shared::LogLevel::Info,
                         }))
                         .ok();
 
@@ -229,16 +228,16 @@ fn browser_cache_asset_scan(
                         //println!("{:?}", entry_url);
 
                         for (i, asset_data_entry) in asset_data.iter().enumerate() {
-                            tx.send(GuiMessage::Progress(ProgressMessage {
+                            tx.send(gui_shared::GuiMessage::Progress(gui_shared::ProgressMessage {
                                 progress: ((i + 1) / asset_data.len()) as f32,
                                 progress_total: ((i + 1) / asset_data.len()) as f32,
                             }))
                             .ok();
 
                             if entry_url.contains(asset_data_entry) {
-                                tx.send(GuiMessage::Log(LogMessage {
+                                tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                                     message: format!("Found a match! {entry_url}"),
-                                    level: LogLevel::Good,
+                                    level: gui_shared::LogLevel::Good,
                                 }))
                                 .ok();
                             }
@@ -285,19 +284,19 @@ fn browser_cache_asset_scan(
                     }
                 }
             } else {
-                tx.send(GuiMessage::Log(LogMessage {
+                tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                     message: format!("Cannot read folder {}", folder_cache_path.display()),
-                    level: LogLevel::Error,
+                    level: gui_shared::LogLevel::Error,
                 }))
                 .ok();
             }
         } else {
-            tx.send(GuiMessage::Log(LogMessage {
+            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                 message: format!(
                     "No cache folder found in profile {}. No attempt to scan.",
                     folder_cache_path.display()
                 ),
-                level: LogLevel::Warning,
+                level: gui_shared::LogLevel::Warning,
             }))
             .ok();
         }
@@ -309,14 +308,14 @@ fn browser_cache_video_scan(
     browser: &Browser,
     video_data: &[dataset::VideoData],
     dataset_filename: &str,
-    tx: &Sender<GuiMessage>,
+    tx: &Sender<gui_shared::GuiMessage>,
 ) {
-    tx.send(GuiMessage::Log(LogMessage {
+    tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: format!(
             "Scanning {}'s cache for {} entries...",
             browser.name, dataset_filename
         ),
-        level: LogLevel::Info,
+        level: gui_shared::LogLevel::Info,
     }))
     .ok();
 
@@ -331,9 +330,9 @@ fn browser_cache_video_scan(
         let folder_cache_path = &browser_cache_profile_root.join(folder).join(profile_cache);
 
         if folder_cache_path.is_dir() {
-            tx.send(GuiMessage::Log(LogMessage {
+            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                 message: format!("Scanning {}", folder_cache_path.display()),
-                level: LogLevel::Info,
+                level: gui_shared::LogLevel::Info,
             }))
             .ok();
 
@@ -357,9 +356,9 @@ fn browser_cache_video_scan(
                                 .to_string_lossy()
                                 .into_owned();
 
-                            tx.send(GuiMessage::Log(LogMessage {
+                            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                                 message: format!("Checking {cache_entry_file_name}"),
-                                level: LogLevel::Info,
+                                level: gui_shared::LogLevel::Info,
                             }))
                             .ok();
 
@@ -408,7 +407,7 @@ fn browser_cache_video_scan(
                                 //                                print!("{i} /{}\r", video_data.len());
                                 //                                io::stdout().flush().unwrap();
 
-                                tx.send(GuiMessage::Progress(ProgressMessage {
+                                tx.send(gui_shared::GuiMessage::Progress(gui_shared::ProgressMessage {
                                     progress: ((i + 1) / video_data.len()) as f32,
                                     progress_total: ((i + 1) / video_data.len()) as f32,
                                 }))
@@ -417,12 +416,12 @@ fn browser_cache_video_scan(
                                 let difference_final = difference_pack.iter().min().unwrap();
                                 // only if difference is less than or equal to 3
                                 if *difference_final <= 3 {
-                                    tx.send(GuiMessage::Log(LogMessage {
+                                    tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                                         message: format!(
                                             "Found a match! Closest difference of {:?} is {:?}!",
                                             video_data_entry.title, difference_final
                                         ),
-                                        level: LogLevel::Good,
+                                        level: gui_shared::LogLevel::Good,
                                     }))
                                     .ok();
 
@@ -442,19 +441,19 @@ fn browser_cache_video_scan(
                     }
                 }
             } else {
-                tx.send(GuiMessage::Log(LogMessage {
+                tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                     message: format!("Cannot read folder {}", folder_cache_path.display()),
-                    level: LogLevel::Error,
+                    level: gui_shared::LogLevel::Error,
                 }))
                 .ok();
             }
         } else {
-            tx.send(GuiMessage::Log(LogMessage {
+            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                 message: format!(
                     "No cache folder found in profile {}. No attempt to scan.",
                     folder_cache_path.display()
                 ),
-                level: LogLevel::Warning,
+                level: gui_shared::LogLevel::Warning,
             }))
             .ok();
         }
@@ -486,10 +485,10 @@ fn extract_videoframes(input_file: &Path, output_file: &Path) {
 }
 
 // Do it all
-pub fn process(tx: Sender<GuiMessage>) {
-    tx.send(GuiMessage::Log(LogMessage {
+pub fn process(tx: Sender<gui_shared::GuiMessage>, options: gui_shared::Options) {
+    tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: "Starting...".into(),
-        level: LogLevel::Info,
+        level: gui_shared::LogLevel::Info,
     }))
     .ok();
     //load browser paths
@@ -498,18 +497,18 @@ pub fn process(tx: Sender<GuiMessage>) {
     //detect browsers installed on the pc
     let detected_browsers = detect_browsers(linux_browser_paths);
 
-    tx.send(GuiMessage::Log(LogMessage {
+    tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: "Detected browsers:".into(),
-        level: LogLevel::Info,
+        level: gui_shared::LogLevel::Info,
     }))
     .ok();
     for browser in &detected_browsers {
-        tx.send(GuiMessage::Log(LogMessage {
+        tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
             message: format!(
                 "\t{} at {} & {}",
                 browser.name, browser.config_path, browser.cache_path
             ),
-            level: LogLevel::Info,
+            level: gui_shared::LogLevel::Info,
         }))
         .ok();
     }
@@ -519,30 +518,40 @@ pub fn process(tx: Sender<GuiMessage>) {
         Ok(dataset) => dataset,
 
         Err(err) => {
-            tx.send(GuiMessage::Log(LogMessage {
+            tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
                 message: format!("Failed loading database: {err}"),
-                level: LogLevel::Error,
+                level: gui_shared::LogLevel::Error,
             }))
             .ok();
-            tx.send(GuiMessage::Finished).ok();
+            tx.send(gui_shared::GuiMessage::Finished).ok();
             return;
         }
     };
-    for browser in &detected_browsers {
-        //search video ids in browser history
-        browser_history_scan(browser, &dataset.history, "history_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+    
+    if options.scan_history {
+        for browser in &detected_browsers {
+            //search video ids in browser history
+            browser_history_scan(browser, &dataset.history, "history_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+        }
     }
-    for browser in &detected_browsers {
-        browser_cache_video_scan(browser, &dataset.video, "video_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+    
+    if options.scan_video {
+        for browser in &detected_browsers {
+            browser_cache_video_scan(browser, &dataset.video, "video_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/CHROME/CHROMIUM on LINUX
+        }
     }
-    for browser in &detected_browsers {
-        //search assets in browser cache
-        browser_cache_asset_scan(browser, &dataset.asset, "asset_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/
+
+    if options.scan_assets {
+        for browser in &detected_browsers {
+            //search assets in browser cache
+            browser_cache_asset_scan(browser, &dataset.asset, "asset_data.txt", &tx); //<--DONE FOR LIBREWOLF/FIREFOX/
+        }
     }
-    tx.send(GuiMessage::Log(LogMessage {
+
+    tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: "Done!".into(),
-        level: LogLevel::Info,
+        level: gui_shared::LogLevel::Info,
     }))
     .ok();
-    tx.send(GuiMessage::Finished).ok();
+    tx.send(gui_shared::GuiMessage::Finished).ok();
 }

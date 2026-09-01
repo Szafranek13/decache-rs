@@ -1,11 +1,15 @@
 fn main() {
     println!(
         "cargo:rustc-env=DECACHE_VERSION={}",
-        std::env::var("DECACHE_VERSION").unwrap_or("0.1.2".into())
+        if cfg!(debug_assertions) {
+            "testing"
+        } else {
+            env!("CARGO_PKG_VERSION")
+        }
     );
     println!(
         "cargo:rustc-env=BUILD_DATE={}",
-        chrono::Local::now().to_rfc3339()
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string()
     );
     println!(
         "cargo:rustc-env=BUILD_TARGET={}",
