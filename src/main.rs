@@ -4,10 +4,9 @@
 //For now main.rs contains the main gui stuff that starts the main scanning function.
 
 // TODO Do something about the ffmpeg bottlneck maybe... maybe it could process multiple files in one process instead of calling ffmpeg everytime
-// TODO The most important functions (or all of them) should return Result propperly instead of panicing
-// TODO Chrome/Chromium stores cache in a weird format, process it
 // TODO Original skips looking into cache entries that are from web.archive.org
-// TODO Add Options to MyApp struct and pass the value to process()
+
+// TODO Fix cache2_entry_metadata.rs so it doesn't panic when the file provided is not a valid cache file
 
 //The original script seems to copy only MP4 FLV and WEBM video files to Unveryfied
 //It also checks if a video file it found is complete by checking if it has ftyp at the beggining of file

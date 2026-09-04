@@ -1,5 +1,4 @@
 use crate::browsette;
-use crate::browsette::*;
 use crate::cache2_entry_metadata;
 use crate::dataset;
 use crate::phash_generator;
@@ -26,7 +25,7 @@ static BASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 fn browser_history_scan(
-    browser: &Browser,
+    browser: &browsette::Browser,
     search_vector: &[String],
     dataset_filename: &str,
     tx: &Sender<gui_shared::GuiMessage>,
@@ -43,7 +42,7 @@ fn browser_history_scan(
 
     let browser_config_profile_root = home_dir.join(browser.config_path);
     //get history file of a profile
-    let profile_list_vector = get_profile_list(browser);
+    let profile_list_vector = browsette::get_profile_list(browser);
     let profile_history = browser.history_file;
 
     for folder in profile_list_vector {
@@ -61,8 +60,8 @@ fn browser_history_scan(
             let conn = Connection::open(history_file).expect("Cannot open history database");
 
             let query = match browser.family {
-                BrowserFamily::Gecko => "SELECT url, title FROM moz_places WHERE url LIKE ?1",
-                BrowserFamily::Chromium => "SELECT url, title FROM urls WHERE url LIKE ?1",
+                browsette::BrowserFamily::Gecko => "SELECT url, title FROM moz_places WHERE url LIKE ?1",
+                browsette::BrowserFamily::Chromium => "SELECT url, title FROM urls WHERE url LIKE ?1",
             };
 
             match conn.prepare(query) {
@@ -175,7 +174,7 @@ fn check_if_video_stream_is_complete() {
 }
 
 fn browser_cache_asset_scan(
-    browser: &Browser,
+    browser: &browsette::Browser,
     asset_data: &[String],
     dataset_filename: &str,
     tx: &Sender<gui_shared::GuiMessage>,
@@ -191,7 +190,7 @@ fn browser_cache_asset_scan(
 
     let home_dir = home_dir().expect("Cannot read $HOME");
 
-    let profile_list_vector = get_profile_list(browser);
+    let profile_list_vector = browsette::get_profile_list(browser);
 
     let browser_cache_profile_root = home_dir.join(browser.cache_path);
     let profile_cache = browser.cache_entries_path;
@@ -305,7 +304,7 @@ fn browser_cache_asset_scan(
 
 /// Scans browser's cache for video files
 fn browser_cache_video_scan(
-    browser: &Browser,
+    browser: &browsette::Browser,
     video_data: &[dataset::VideoData],
     dataset_filename: &str,
     tx: &Sender<gui_shared::GuiMessage>,
@@ -321,7 +320,7 @@ fn browser_cache_video_scan(
 
     let home_dir = home_dir().expect("Cannot read $HOME");
 
-    let profile_list_vector = get_profile_list(browser);
+    let profile_list_vector = browsette::get_profile_list(browser);
 
     let browser_cache_profile_root = home_dir.join(browser.cache_path);
     let profile_cache = browser.cache_entries_path;
@@ -486,6 +485,20 @@ fn extract_videoframes(input_file: &Path, output_file: &Path) {
 
 // Do it all
 pub fn process(tx: Sender<gui_shared::GuiMessage>, options: gui_shared::Options) {
+    // If at least one option is checked then do the stuff, otherwise call user dumb.
+    if !options.scan_video
+        && !options.scan_assets
+        && !options.scan_history
+    {
+        tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
+            message: format!("You need to check any scanning option in the options."),
+            level: gui_shared::LogLevel::Error,
+        }))
+        .ok();
+        tx.send(gui_shared::GuiMessage::Finished).ok();
+        return
+    }
+
     tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: "Starting...".into(),
         level: gui_shared::LogLevel::Info,
@@ -495,7 +508,7 @@ pub fn process(tx: Sender<gui_shared::GuiMessage>, options: gui_shared::Options)
     let linux_browser_paths = browsette::SUPPORTED_BROWSERS;
 
     //detect browsers installed on the pc
-    let detected_browsers = detect_browsers(linux_browser_paths);
+    let detected_browsers = browsette::detect_browsers(linux_browser_paths);
 
     tx.send(gui_shared::GuiMessage::Log(gui_shared::LogMessage {
         message: "Detected browsers:".into(),
@@ -527,7 +540,7 @@ pub fn process(tx: Sender<gui_shared::GuiMessage>, options: gui_shared::Options)
             return;
         }
     };
-    
+
     if options.scan_history {
         for browser in &detected_browsers {
             //search video ids in browser history
@@ -555,3 +568,4 @@ pub fn process(tx: Sender<gui_shared::GuiMessage>, options: gui_shared::Options)
     .ok();
     tx.send(gui_shared::GuiMessage::Finished).ok();
 }
+
